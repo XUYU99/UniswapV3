@@ -5,9 +5,10 @@ import "hardhat/console.sol";
 /// @title 提供从 factory、代币和手续费推导池地址的函数库
 library PoolAddress {
     // 初始化代码哈希，用于 CREATE2 地址计算（Uniswap V3 Pool 的部署代码哈希）
+    // bytes32 internal constant POOL_INIT_CODE_HASH =
+    //     0xe34f199b19b2b4f47f68442619d555527d244f78a3297ea89325f843f87b8b54;
     bytes32 internal constant POOL_INIT_CODE_HASH =
-        0xe34f199b19b2b4f47f68442619d555527d244f78a3297ea89325f843f87b8b54;
-
+        0xd3e7f58b9af034cfa7a0597e539bae7c6b393817a47a6fc1e1503cd6eaffe22a;
     /// @notice 表示池子的唯一标识键（token0、token1 和 fee 的组合）
     struct PoolKey {
         address token0;

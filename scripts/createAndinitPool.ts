@@ -7,19 +7,31 @@ import {
 
 import dotenv from "dotenv";
 dotenv.config();
-
-async function createAndinitPool() {
+// export let KOKOAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+// export let ACAddress = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512";
+// export let V3FactoryAddress = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0";
+// export let NonfungiblePositionManagerAddress =
+//   "0x5fc8d32690cc91d4c39d9d3abcbd16989f875707";
+// export let poolAddress: string;
+export var KOKOAddress: string,
+  ACAddress: string,
+  V3FactoryAddress: string,
+  NFTDescriptorAddress: string,
+  PositionDescriptorAddress: string,
+  NonfungiblePositionManagerAddress: string;
+export var poolAddress: string;
+export async function createAndinitPool() {
   const [deployer] = await ethers.getSigners();
   console.log("Deployer:", deployer.address);
-
-  // 部署两个 ERC20 代币：KOKO 和 AC
+  console.log("-----------create AND init --------------");
+  // 1、部署 KOKO 和 AC 代币
   const MyERC20 = await ethers.getContractFactory("MyERC20", deployer);
   const KOKO = await MyERC20.deploy("koko", "KO");
   await KOKO.waitForDeployment();
   const AC = await MyERC20.deploy("ac", "AC");
   await AC.waitForDeployment();
-  const KOKOAddress = await KOKO.getAddress();
-  const ACAddress = await AC.getAddress();
+  KOKOAddress = await KOKO.getAddress();
+  ACAddress = await AC.getAddress();
 
   console.log(`✅ KOKO Token 地址: ${KOKOAddress}`);
   console.log(`✅ AC Token 地址:   ${ACAddress}`);
@@ -40,7 +52,7 @@ async function createAndinitPool() {
   const Factory = await ethers.getContractFactory("UniswapV3Factory", deployer);
   const V3Factory = await Factory.deploy();
   await V3Factory.waitForDeployment();
-  const V3FactoryAddress = await V3Factory.getAddress();
+  V3FactoryAddress = await V3Factory.getAddress();
 
   // 部署 NFTDescriptor 库
   const NFTDescriptorFactory = await ethers.getContractFactory(
@@ -49,9 +61,9 @@ async function createAndinitPool() {
   );
   const NFTDescriptor = await NFTDescriptorFactory.deploy();
   await NFTDescriptor.waitForDeployment();
-  const NFTDescriptorAddress = await NFTDescriptor.getAddress();
+  NFTDescriptorAddress = await NFTDescriptor.getAddress();
 
-  // 使用 NFTDescriptor 作为库部署 NonfungibleTokenPositionDescriptor
+  // 部署 NonfungibleTokenPositionDescriptor (NFT元数据生成器)：把 LP 的参数变成描述信息（如交易对、tick 区间、手续费等级等），最终生成一段 metadata JSON 的 Base64 编码 URI
   const PositionDescriptorFactory = await ethers.getContractFactory(
     "NonfungibleTokenPositionDescriptor",
     {
@@ -67,9 +79,9 @@ async function createAndinitPool() {
     formatBytes32String("ETH")
   );
   await PositionDescriptor.waitForDeployment();
-  const PositionDescriptorAddress = await PositionDescriptor.getAddress();
+  PositionDescriptorAddress = await PositionDescriptor.getAddress();
 
-  // 部署 NonfungiblePositionManager
+  // 部署 NonfungiblePositionManager (管理流动性头寸的主合约)
   const NonfungiblePositionManagerFactory = await ethers.getContractFactory(
     "NonfungiblePositionManager",
     deployer
@@ -81,11 +93,9 @@ async function createAndinitPool() {
       PositionDescriptorAddress
     );
   await NonfungiblePositionManager.waitForDeployment();
-  const NonfungiblePositionManagerAddress =
+  NonfungiblePositionManagerAddress =
     await NonfungiblePositionManager.getAddress();
 
-  console.log(`✅ KOKO 地址:           ${KOKOAddress}`);
-  console.log(`✅ AC 地址:           ${ACAddress}`);
   console.log(`✅ Uniswap V3 Factory:  ${V3FactoryAddress}`);
   console.log(`✅ NFTDescriptor 地址:  ${NFTDescriptorAddress}`);
   console.log(`✅ PositionDescriptor:  ${PositionDescriptorAddress}`);
@@ -95,8 +105,9 @@ async function createAndinitPool() {
 
   // ✅ 创建并初始化池（可选）
   const fee = 3000; // 0.3%
-  const sqrtPriceX96 = BigInt("79228162514264337593543950336"); // 即 2^96
-  // √1 = 1 → 2^96 = 79228162514264337593543950336
+  const sqrtPriceX96 = BigInt("35430442183289009309045761674892"); // 200
+  // √1 = 1 → 2^96 = 79228162514264337593543950336 //即 2^96
+
   const initPool_Tx = await NonfungiblePositionManager.connect(
     deployer
   ).createAndInitializePoolIfNecessary(
@@ -107,31 +118,34 @@ async function createAndinitPool() {
   );
 
   const receipt = await initPool_Tx.wait();
-  console.log("receipt:", receipt);
-  console.log("----------- receipt end --------------");
-  const poolAddress = await V3Factory.getPool(KOKOAddress, ACAddress, fee);
-  console.log("poolAddress:", poolAddress);
-  const pool = await ethers.getContractAt("IUniswapV3Pool", poolAddress);
+  poolAddress = await V3Factory.getPool(KOKOAddress, ACAddress, fee);
+  console.log(`✅ poolAddress:  ${poolAddress}`);
 
-  if (receipt) {
-    for (const log of receipt.logs) {
-      try {
-        const parsed = pool.interface.parseLog(log);
-        // console.log("parsed:", parsed);
-        if (parsed) {
-          if (parsed.name === "Initialize") {
-            console.log("sqrtPriceX96:", parsed.args.sqrtPriceX96.toString());
-            console.log("tick:", parsed.args.tick.toString());
-          }
-        }
-      } catch (_) {}
-    }
-  }
+  // console.log("receipt:", receipt);
+  // console.log("----------- receipt end --------------");
 
-  console.log("✅ Pool created and initialized.");
+  // if (receipt) {
+  //   for (const log of receipt.logs) {
+  //     try {
+  //       const parsed = pool.interface.parseLog(log);
+  //       // console.log("parsed:", parsed);
+  //       if (parsed) {
+  //         if (parsed.name === "Initialize") {
+  //           console.log("sqrtPriceX96:", parsed.args.sqrtPriceX96.toString());
+  //           console.log("tick:", parsed.args.tick.toString());
+  //         }
+  //       }
+  //     } catch (_) {}
+  //   }
+  // }
+
+  // const poolFactory = await ethers.getContractFactory("UniswapV3Pool");
+  // const localInitCodeHash = ethers.keccak256(poolFactory.bytecode);
+  // console.log("🔬 本地计算 init code hash:", localInitCodeHash);
+  // console.log("✅ Pool created and initialized.");
 }
 
-createAndinitPool().catch((err) => {
-  console.error("❌ 脚本执行失败:", err);
-  process.exit(1);
-});
+// createAndinitPool().catch((err) => {
+//   console.error("❌ 脚本执行失败:", err);
+//   process.exit(1);
+// });
