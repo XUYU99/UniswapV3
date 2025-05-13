@@ -14,24 +14,29 @@ library LiquidityAmounts {
         require((y = uint128(x)) == x);
     }
 
-    /// @notice Computes the amount of liquidity received for a given amount of token0 and price range
-    /// @dev Calculates amount0 * (sqrt(upper) * sqrt(lower)) / (sqrt(upper) - sqrt(lower))
-    /// @param sqrtRatioAX96 A sqrt price representing the first tick boundary
-    /// @param sqrtRatioBX96 A sqrt price representing the second tick boundary
-    /// @param amount0 The amount0 being sent in
-    /// @return liquidity The amount of returned liquidity
+    /// 根据提供的 token0 数量和价格区间，计算可以获得的流动性
+    /// 使用公式：流动性 liquidity = amount0 × (sqrt(upper) × sqrt(lower)) / (sqrt(upper) - sqrt(lower))
+    /// @param sqrtRatioAX96 tick 边界 A 的平方根价格（Q64.96 格式）
+    /// @param sqrtRatioBX96 tick 边界 B 的平方根价格（Q64.96 格式）
+    /// @param amount0 提供的 token0 数量
+    /// @return liquidity 返回可获得的流动性数量
     function getLiquidityForAmount0(
         uint160 sqrtRatioAX96,
         uint160 sqrtRatioBX96,
         uint256 amount0
     ) internal pure returns (uint128 liquidity) {
+        // 若价格顺序错误，则交换上下边界
         if (sqrtRatioAX96 > sqrtRatioBX96)
             (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
+
+        // intermediate = sqrtA * sqrtB / Q96，用于提升精度
         uint256 intermediate = FullMath.mulDiv(
             sqrtRatioAX96,
             sqrtRatioBX96,
             FixedPoint96.Q96
         );
+
+        // 最终 liquidity = amount0 × intermediate / (sqrtB - sqrtA)
         return
             toUint128(
                 FullMath.mulDiv(
@@ -65,14 +70,14 @@ library LiquidityAmounts {
             );
     }
 
-    /// @notice Computes the maximum amount of liquidity received for a given amount of token0, token1, the current
-    /// pool prices and the prices at the tick boundaries
+    /// @notice 基于给定的 token0、token1 数量、当前池子价格和 tick 边界价格，计算可获得的最大流动性
     /// @param sqrtRatioX96 A sqrt price representing the current pool prices
-    /// @param sqrtRatioAX96 A sqrt price representing the first tick boundary
-    /// @param sqrtRatioBX96 A sqrt price representing the second tick boundary
-    /// @param amount0 The amount of token0 being sent in
-    /// @param amount1 The amount of token1 being sent in
-    /// @return liquidity The maximum amount of liquidity received
+    /// @param sqrtRatioX96 当前池子的平方根价格（Q64.96 格式）
+    /// @param sqrtRatioAX96 第一个 tick 边界的平方根价格
+    /// @param sqrtRatioBX96 第二个 tick 边界的平方根价格
+    /// @param amount0 提供的 token0 数量
+    /// @param amount1 提供的 token1 数量
+    /// @return liquidity 可获得的最大流动性数量
     function getLiquidityForAmounts(
         uint160 sqrtRatioX96,
         uint160 sqrtRatioAX96,
@@ -80,16 +85,20 @@ library LiquidityAmounts {
         uint256 amount0,
         uint256 amount1
     ) internal pure returns (uint128 liquidity) {
+        // 如果输入的 tick 边界顺序反了，交换顺序，确保 sqrtRatioAX96 < sqrtRatioBX96
         if (sqrtRatioAX96 > sqrtRatioBX96)
             (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
 
+        // 当前价格小于等于最小 tick（价格在区间左边） → 只能用 token0 提供流动性
         if (sqrtRatioX96 <= sqrtRatioAX96) {
             liquidity = getLiquidityForAmount0(
                 sqrtRatioAX96,
                 sqrtRatioBX96,
                 amount0
             );
-        } else if (sqrtRatioX96 < sqrtRatioBX96) {
+        }
+        // 当前价格位于两个 tick 之间 → 同时用 token0 和 token1 提供流动性，取最小的那一侧
+        else if (sqrtRatioX96 < sqrtRatioBX96) {
             uint128 liquidity0 = getLiquidityForAmount0(
                 sqrtRatioX96,
                 sqrtRatioBX96,
@@ -102,7 +111,9 @@ library LiquidityAmounts {
             );
 
             liquidity = liquidity0 < liquidity1 ? liquidity0 : liquidity1;
-        } else {
+        }
+        // 当前价格高于右边界 tick（价格在区间右边） → 只能用 token1 提供流动性
+        else {
             liquidity = getLiquidityForAmount1(
                 sqrtRatioAX96,
                 sqrtRatioBX96,

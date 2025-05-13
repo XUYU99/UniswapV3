@@ -148,7 +148,6 @@ contract NonfungiblePositionManager is
         )
     {
         IUniswapV3Pool pool;
-        // console.log("NonfungiblePositionManager-mint()-111");
         // 调用 addLiquidity 向池子中添加流动性
         (liquidity, amount0, amount1, pool) = addLiquidity(
             AddLiquidityParams({

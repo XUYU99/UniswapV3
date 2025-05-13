@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity >=0.5.0;
-import "hardhat/console.sol";
 
 /// @title 提供从 factory、代币和手续费推导池地址的函数库
 library PoolAddress {
@@ -56,6 +55,5 @@ library PoolAddress {
                 )
             )
         );
-        console.log("PoolAddress.computeAddress(factory, key)-pool: %s", pool);
     }
 }

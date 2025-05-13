@@ -4,7 +4,8 @@ pragma solidity =0.7.6;
 import "./interfaces/IUniswapV3PoolDeployer.sol";
 
 import "./UniswapV3Pool.sol";
-import "hardhat/console.sol";
+
+// import "hardhat/console.sol";
 
 contract UniswapV3PoolDeployer is IUniswapV3PoolDeployer {
     struct Parameters {
@@ -45,6 +46,6 @@ contract UniswapV3PoolDeployer is IUniswapV3PoolDeployer {
             }()
         );
         delete parameters;
-        console.log("UniswapV3PoolDeployer.deploy", pool);
+        // console.log("UniswapV3PoolDeployer.deploy", pool);
     }
 }

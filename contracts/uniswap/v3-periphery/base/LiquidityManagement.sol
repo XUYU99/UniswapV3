@@ -77,20 +77,28 @@ abstract contract LiquidityManagement is
             params.token1,
             params.fee
         );
-        console.log(
-            "LiquidityManagement.addLiquidity-factoryGetpool- params.token0_ params.token1: ",
-            factoryGetpool,
-            params.token0,
-            params.token1
-        );
-        console.log("-params.fee: ", uint256(params.fee));
+        // console.log(
+        //     "LiquidityManagement.addLiquidity-factoryGetpool- params.token0_ params.token1: ",
+        //     factoryGetpool,
+        //     params.token0,
+        //     params.token1
+        // );
+        // console.log("-params.fee: ", uint256(params.fee));
 
         // compute the liquidity amount
         {
             (uint160 sqrtPriceX96, , , , , , ) = pool.slot0();
+            // console.log(
+            //     "LiquidityManagement.addLiquidity-sqrtPriceX96: ",
+            //     uint256(sqrtPriceX96)
+            // );
             uint160 sqrtRatioAX96 = TickMath.getSqrtRatioAtTick(
                 params.tickLower
             );
+            // console.log(
+            //     "LiquidityManagement.addLiquidity-sqrtRatioAX96: ",
+            //     uint256(sqrtRatioAX96)
+            // );
             uint160 sqrtRatioBX96 = TickMath.getSqrtRatioAtTick(
                 params.tickUpper
             );
@@ -102,6 +110,11 @@ abstract contract LiquidityManagement is
                 params.amount0Desired,
                 params.amount1Desired
             );
+
+            // console.log(
+            //     "LiquidityManagement.addLiquidity-liquidity: ",
+            //     uint256(liquidity)
+            // );
         }
 
         (amount0, amount1) = pool.mint(
