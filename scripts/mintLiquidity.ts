@@ -20,29 +20,31 @@ import {
 } from "./createAndinitPool";
 
 export async function mintLiquidity() {
-  console.log("----------- mint --------------");
+  console.log(
+    "----------------------------- mint --------------------------------"
+  );
   // 1、获取部署者账户,以及已部署合约地址
   const [deployer] = await ethers.getSigners();
   const deployerAddress = await deployer.getAddress();
-  console.log("Deployer:", deployerAddress);
-  console.log("KOKOAddress:", KOKOAddress);
-  console.log("ACAddress:", ACAddress);
-  console.log("V3FactoryAddress:", V3FactoryAddress);
-  console.log(
-    "NonfungiblePositionManagerAddress:",
-    NonfungiblePositionManagerAddress
-  );
-  console.log("poolAddress:", poolAddress);
+  // console.log("Deployer:", deployerAddress);
+  // console.log("KOKOAddress:", KOKOAddress);
+  // console.log("ACAddress:", ACAddress);
+  // console.log("V3FactoryAddress:", V3FactoryAddress);
+  // console.log(
+  //   "NonfungiblePositionManagerAddress:",
+  //   NonfungiblePositionManagerAddress
+  // );
+  // console.log("poolAddress:", poolAddress);
   // --------------------- 1、获取合约实例 ----------------------
   // 获取 NonfungiblePositionManager 和 pool 合约实例
-  const PositionManager = await ethers.getContractAt(
+  const NonfungiblePositionManager = await ethers.getContractAt(
     "NonfungiblePositionManager",
     NonfungiblePositionManagerAddress
   );
-  console.log(
-    "mintLiquidity-NonfungiblePositionManagerAddress:",
-    NonfungiblePositionManagerAddress
-  );
+  // console.log(
+  //   "mintLiquidity-NonfungiblePositionManagerAddress:",
+  //   NonfungiblePositionManagerAddress
+  // );
   const pool = await ethers.getContractAt("UniswapV3Pool", poolAddress);
 
   // 获取 ERC20 Token 合约实例
@@ -56,8 +58,11 @@ export async function mintLiquidity() {
   // 授权 PositionManager 操作用户的代币（KOKO & AC）
   await KOKO.approve(NonfungiblePositionManagerAddress, amount0Desired);
   await AC.approve(NonfungiblePositionManagerAddress, amount1Desired);
-  console.log("✅ Tokens approved.");
-
+  // 查看余额
+  console.log(
+    "mint前： accountA AC币余额 :",
+    (await AC.balanceOf(deployerAddress)).toString()
+  );
   // （可选）获取池子合约地址并确认是否已部署
   // const V3Factory = await ethers.getContractAt(
   //   "UniswapV3Factory",
@@ -72,11 +77,11 @@ export async function mintLiquidity() {
   const fee = 3000;
   const amount0Min = 0; // slippage下限
   const amount1Min = 0;
-  const tickLower = -60000; // tick 区间下限
-  const tickUpper = 60000; // tick 区间上限
+  const tickLower = -300; // tick 区间下限 !!! tick 要是 spacing 的倍数
+  const tickUpper = 300; // tick 区间上限
   const deadline = Math.floor(Date.now() / 1000) + 60 * 10; // 当前时间 + 10 分钟
   // 调用 mint() 创建流动性头寸并铸造 LP NFT
-  const tx = await PositionManager.mint({
+  const tx = await NonfungiblePositionManager.mint({
     token0: KOKOAddress,
     token1: ACAddress,
     fee,
@@ -102,7 +107,6 @@ export async function mintLiquidity() {
         if (parsed) {
           if (parsed.name === "IncreaseLiquidity") {
             ({ tokenId, liquidity, amount0, amount1 } = parsed.args);
-            console.log("✅ Mint 成功:");
             console.log("Token ID:", tokenId.toString());
             console.log("Liquidity:", liquidity.toString());
             console.log("amount0:", amount0.toString());
@@ -117,7 +121,7 @@ export async function mintLiquidity() {
 
     // --------------------- 4、查看mint后状态 ----------------------
     // === 1️⃣ 获取 NFT TokenId 持仓信息 ===
-    const position = await PositionManager.positions(tokenId);
+    const position = await NonfungiblePositionManager.positions(tokenId);
 
     console.log(" Position Info:");
     console.log({
@@ -145,5 +149,10 @@ export async function mintLiquidity() {
     });
 
     console.log("✅ mintLiquidity successfull.");
+
+    console.log(
+      "mint后： accountA AC币余额 :",
+      (await AC.balanceOf(deployerAddress)).toString()
+    );
   }
 }

@@ -48,31 +48,34 @@ library Position {
         // );
     }
 
-    /// @notice Credits accumulated fees to a user's position
-    /// @param self The individual position to update
-    /// @param liquidityDelta The change in pool liquidity as a result of the position update
-    /// @param feeGrowthInside0X128 The all-time fee growth in token0, per unit of liquidity, inside the position's tick boundaries
-    /// @param feeGrowthInside1X128 The all-time fee growth in token1, per unit of liquidity, inside the position's tick boundaries
+    /// @notice 将已累积的手续费计入用户的头寸中
+    /// @param self 要更新的头寸对象（Position.Info）
+    /// @param liquidityDelta 头寸变动导致的流动性变化值（可以为正或负）
+    /// @param feeGrowthInside0X128 该头寸 tick 区间内 token0 的累计单位手续费增长
+    /// @param feeGrowthInside1X128 该头寸 tick 区间内 token1 的累计单位手续费增长
     function update(
         Info storage self,
         int128 liquidityDelta,
         uint256 feeGrowthInside0X128,
         uint256 feeGrowthInside1X128
     ) internal {
+        // 将当前头寸复制为临时变量，减少 SLOAD（gas 优化）
         Info memory _self = self;
 
         uint128 liquidityNext;
         if (liquidityDelta == 0) {
-            require(_self.liquidity > 0, "NP"); // disallow pokes for 0 liquidity positions
+            // 不允许对 liquidity 为 0 的头寸进行 “poke” 操作（即无流动性但试图更新）
+            require(_self.liquidity > 0, "NP");
             liquidityNext = _self.liquidity;
         } else {
+            // 根据 delta 计算更新后的流动性（增加或减少）
             liquidityNext = LiquidityMath.addDelta(
                 _self.liquidity,
                 liquidityDelta
             );
         }
 
-        // calculate accumulated fees
+        // 计算从上次记录以来所累积的 token0 手续费
         uint128 tokensOwed0 = uint128(
             FullMath.mulDiv(
                 feeGrowthInside0X128 - _self.feeGrowthInside0LastX128,
@@ -80,6 +83,8 @@ library Position {
                 FixedPoint128.Q128
             )
         );
+
+        // 计算从上次记录以来所累积的 token1 手续费
         uint128 tokensOwed1 = uint128(
             FullMath.mulDiv(
                 feeGrowthInside1X128 - _self.feeGrowthInside1LastX128,
@@ -88,12 +93,15 @@ library Position {
             )
         );
 
-        // update the position
+        // 更新头寸状态
         if (liquidityDelta != 0) self.liquidity = liquidityNext;
+
+        // 更新手续费增长快照（记录“当前时刻”的增长值）
         self.feeGrowthInside0LastX128 = feeGrowthInside0X128;
         self.feeGrowthInside1LastX128 = feeGrowthInside1X128;
+
         if (tokensOwed0 > 0 || tokensOwed1 > 0) {
-            // overflow is acceptable, have to withdraw before you hit type(uint128).max fees
+            // 可以接受 overflow，反正超过 uint128 最大值前必须领取掉收益
             self.tokensOwed0 += tokensOwed0;
             self.tokensOwed1 += tokensOwed1;
         }

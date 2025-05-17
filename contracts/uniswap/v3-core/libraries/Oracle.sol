@@ -38,7 +38,8 @@ library Oracle {
             Observation({
                 blockTimestamp: blockTimestamp,
                 tickCumulative: last.tickCumulative + int56(tick) * delta,
-                secondsPerLiquidityCumulativeX128: last.secondsPerLiquidityCumulativeX128 +
+                secondsPerLiquidityCumulativeX128: last
+                    .secondsPerLiquidityCumulativeX128 +
                     ((uint160(delta) << 128) / (liquidity > 0 ? liquidity : 1)),
                 initialized: true
             });
@@ -49,10 +50,10 @@ library Oracle {
     /// @param time The time of the oracle initialization, via block.timestamp truncated to uint32
     /// @return cardinality The number of populated elements in the oracle array
     /// @return cardinalityNext The new length of the oracle array, independent of population
-    function initialize(Observation[65535] storage self, uint32 time)
-        internal
-        returns (uint16 cardinality, uint16 cardinalityNext)
-    {
+    function initialize(
+        Observation[65535] storage self,
+        uint32 time
+    ) internal returns (uint16 cardinality, uint16 cardinalityNext) {
         self[0] = Observation({
             blockTimestamp: time,
             tickCumulative: 0,
@@ -110,7 +111,7 @@ library Oracle {
         uint16 current,
         uint16 next
     ) internal returns (uint16) {
-        require(current > 0, 'I');
+        require(current > 0, "I");
         // no-op if the passed next value isn't greater than the current next value
         if (next <= current) return current;
         // store in each slot to prevent fresh SSTOREs in swaps
@@ -125,16 +126,12 @@ library Oracle {
     /// @param a A comparison timestamp from which to determine the relative position of `time`
     /// @param b From which to determine the relative position of `time`
     /// @return bool Whether `a` is chronologically <= `b`
-    function lte(
-        uint32 time,
-        uint32 a,
-        uint32 b
-    ) private pure returns (bool) {
+    function lte(uint32 time, uint32 a, uint32 b) private pure returns (bool) {
         // if there hasn't been overflow, no need to adjust
         if (a <= time && b <= time) return a <= b;
 
-        uint256 aAdjusted = a > time ? a : a + 2**32;
-        uint256 bAdjusted = b > time ? b : b + 2**32;
+        uint256 aAdjusted = a > time ? a : a + 2 ** 32;
+        uint256 bAdjusted = b > time ? b : b + 2 ** 32;
 
         return aAdjusted <= bAdjusted;
     }
@@ -156,7 +153,11 @@ library Oracle {
         uint32 target,
         uint16 index,
         uint16 cardinality
-    ) private view returns (Observation memory beforeOrAt, Observation memory atOrAfter) {
+    )
+        private
+        view
+        returns (Observation memory beforeOrAt, Observation memory atOrAfter)
+    {
         uint256 l = (index + 1) % cardinality; // oldest observation
         uint256 r = l + cardinality - 1; // newest observation
         uint256 i;
@@ -176,7 +177,8 @@ library Oracle {
             bool targetAtOrAfter = lte(time, beforeOrAt.blockTimestamp, target);
 
             // check if we've found the answer!
-            if (targetAtOrAfter && lte(time, target, atOrAfter.blockTimestamp)) break;
+            if (targetAtOrAfter && lte(time, target, atOrAfter.blockTimestamp))
+                break;
 
             if (!targetAtOrAfter) r = i - 1;
             else l = i + 1;
@@ -203,7 +205,11 @@ library Oracle {
         uint16 index,
         uint128 liquidity,
         uint16 cardinality
-    ) private view returns (Observation memory beforeOrAt, Observation memory atOrAfter) {
+    )
+        private
+        view
+        returns (Observation memory beforeOrAt, Observation memory atOrAfter)
+    {
         // optimistically set before to the newest observation
         beforeOrAt = self[index];
 
@@ -214,7 +220,10 @@ library Oracle {
                 return (beforeOrAt, atOrAfter);
             } else {
                 // otherwise, we need to transform
-                return (beforeOrAt, transform(beforeOrAt, target, tick, liquidity));
+                return (
+                    beforeOrAt,
+                    transform(beforeOrAt, target, tick, liquidity)
+                );
             }
         }
 
@@ -223,25 +232,24 @@ library Oracle {
         if (!beforeOrAt.initialized) beforeOrAt = self[0];
 
         // ensure that the target is chronologically at or after the oldest observation
-        require(lte(time, beforeOrAt.blockTimestamp, target), 'OLD');
+        require(lte(time, beforeOrAt.blockTimestamp, target), "OLD");
 
         // if we've reached this point, we have to binary search
         return binarySearch(self, time, target, index, cardinality);
     }
 
-    /// @dev Reverts if an observation at or before the desired observation timestamp does not exist.
-    /// 0 may be passed as `secondsAgo' to return the current cumulative values.
-    /// If called with a timestamp falling between two observations, returns the counterfactual accumulator values
-    /// at exactly the timestamp between the two observations.
-    /// @param self The stored oracle array
-    /// @param time The current block timestamp
-    /// @param secondsAgo The amount of time to look back, in seconds, at which point to return an observation
-    /// @param tick The current tick
-    /// @param index The index of the observation that was most recently written to the observations array
-    /// @param liquidity The current in-range pool liquidity
-    /// @param cardinality The number of populated elements in the oracle array
-    /// @return tickCumulative The tick * time elapsed since the pool was first initialized, as of `secondsAgo`
-    /// @return secondsPerLiquidityCumulativeX128 The time elapsed / max(1, liquidity) since the pool was first initialized, as of `secondsAgo`
+    /// @dev 如果在目标时间戳之前或相同的时间戳上没有找到观测值，则 revert。
+    /// 可以传入 0 作为 `secondsAgo` 以获取当前的累计值。
+    /// 如果调用的时间戳在两个观测点之间，则返回该时间点的“理论”累加值（线性插值）
+    /// @param self 存储的预言机观测数组
+    /// @param time 当前区块的时间戳（block.timestamp）
+    /// @param secondsAgo 回溯的秒数，表示需要返回 secondsAgo 秒前的观测数据
+    /// @param tick 当前池子的 tick 值
+    /// @param index 观测数组中最近一次写入的位置索引
+    /// @param liquidity 当前池中处于价格区间内的流动性
+    /// @param cardinality 当前预言机数组中已填充的观测数量（有效长度）
+    /// @return tickCumulative 从池初始化开始累积的 tick × 时间 值，返回的是 secondsAgo 时刻的值
+    /// @return secondsPerLiquidityCumulativeX128 从池初始化开始累积的 seconds / liquidity 值（Q128.128 格式），返回的是 secondsAgo 时刻的值
     function observeSingle(
         Observation[65535] storage self,
         uint32 time,
@@ -250,36 +258,75 @@ library Oracle {
         uint16 index,
         uint128 liquidity,
         uint16 cardinality
-    ) internal view returns (int56 tickCumulative, uint160 secondsPerLiquidityCumulativeX128) {
+    )
+        internal
+        view
+        returns (
+            int56 tickCumulative,
+            uint160 secondsPerLiquidityCumulativeX128
+        )
+    {
+        // 如果回溯时间为 0，表示要获取当前的累计值
         if (secondsAgo == 0) {
             Observation memory last = self[index];
-            if (last.blockTimestamp != time) last = transform(last, time, tick, liquidity);
-            return (last.tickCumulative, last.secondsPerLiquidityCumulativeX128);
+            // 如果当前时间和上一个观测的时间不一致，需要更新一个“虚拟观测”
+            if (last.blockTimestamp != time)
+                last = transform(last, time, tick, liquidity);
+            return (
+                last.tickCumulative,
+                last.secondsPerLiquidityCumulativeX128
+            );
         }
 
+        // 目标时间戳（往前 secondsAgo 秒）
         uint32 target = time - secondsAgo;
 
-        (Observation memory beforeOrAt, Observation memory atOrAfter) =
-            getSurroundingObservations(self, time, target, tick, index, liquidity, cardinality);
+        // 在观测数组中找出靠近目标时间戳的两个观测点：一个在它左边，一个在右边
+        (
+            Observation memory beforeOrAt,
+            Observation memory atOrAfter
+        ) = getSurroundingObservations(
+                self,
+                time,
+                target,
+                tick,
+                index,
+                liquidity,
+                cardinality
+            );
 
+        // 如果目标时间正好等于左边观测点的时间戳，直接返回
         if (target == beforeOrAt.blockTimestamp) {
-            // we're at the left boundary
-            return (beforeOrAt.tickCumulative, beforeOrAt.secondsPerLiquidityCumulativeX128);
-        } else if (target == atOrAfter.blockTimestamp) {
-            // we're at the right boundary
-            return (atOrAfter.tickCumulative, atOrAfter.secondsPerLiquidityCumulativeX128);
-        } else {
-            // we're in the middle
-            uint32 observationTimeDelta = atOrAfter.blockTimestamp - beforeOrAt.blockTimestamp;
-            uint32 targetDelta = target - beforeOrAt.blockTimestamp;
             return (
+                beforeOrAt.tickCumulative,
+                beforeOrAt.secondsPerLiquidityCumulativeX128
+            );
+        }
+        // 如果目标时间正好等于右边观测点的时间戳，也可以直接返回
+        else if (target == atOrAfter.blockTimestamp) {
+            return (
+                atOrAfter.tickCumulative,
+                atOrAfter.secondsPerLiquidityCumulativeX128
+            );
+        }
+        // 如果目标时间在两个观测点之间，则进行线性插值计算
+        else {
+            uint32 observationTimeDelta = atOrAfter.blockTimestamp -
+                beforeOrAt.blockTimestamp;
+            uint32 targetDelta = target - beforeOrAt.blockTimestamp;
+
+            return (
+                // tickCumulative 插值：before值 + 差值比例 × 时间跨度
                 beforeOrAt.tickCumulative +
-                    ((atOrAfter.tickCumulative - beforeOrAt.tickCumulative) / observationTimeDelta) *
+                    ((atOrAfter.tickCumulative - beforeOrAt.tickCumulative) /
+                        observationTimeDelta) *
                     targetDelta,
+                // secondsPerLiquidity 插值（Q128.128 精度）
                 beforeOrAt.secondsPerLiquidityCumulativeX128 +
                     uint160(
                         (uint256(
-                            atOrAfter.secondsPerLiquidityCumulativeX128 - beforeOrAt.secondsPerLiquidityCumulativeX128
+                            atOrAfter.secondsPerLiquidityCumulativeX128 -
+                                beforeOrAt.secondsPerLiquidityCumulativeX128
                         ) * targetDelta) / observationTimeDelta
                     )
             );
@@ -305,13 +352,23 @@ library Oracle {
         uint16 index,
         uint128 liquidity,
         uint16 cardinality
-    ) internal view returns (int56[] memory tickCumulatives, uint160[] memory secondsPerLiquidityCumulativeX128s) {
-        require(cardinality > 0, 'I');
+    )
+        internal
+        view
+        returns (
+            int56[] memory tickCumulatives,
+            uint160[] memory secondsPerLiquidityCumulativeX128s
+        )
+    {
+        require(cardinality > 0, "I");
 
         tickCumulatives = new int56[](secondsAgos.length);
         secondsPerLiquidityCumulativeX128s = new uint160[](secondsAgos.length);
         for (uint256 i = 0; i < secondsAgos.length; i++) {
-            (tickCumulatives[i], secondsPerLiquidityCumulativeX128s[i]) = observeSingle(
+            (
+                tickCumulatives[i],
+                secondsPerLiquidityCumulativeX128s[i]
+            ) = observeSingle(
                 self,
                 time,
                 secondsAgos[i],

@@ -10,7 +10,8 @@ dotenv.config();
 
 import { createAndinitPool } from "./createAndinitPool";
 import { mintLiquidity } from "./mintLiquidity";
-
+import { addLiquidity } from "./addLiquidity";
+import { swapExactInputSingle } from "./swap";
 async function TestInit() {
   const [deployer] = await ethers.getSigners();
 
@@ -19,6 +20,10 @@ async function TestInit() {
 
   // 调用 mintLiquidity 函数
   await mintLiquidity();
+
+  await addLiquidity();
+
+  // await swapExactInputSingle();
 }
 
 TestInit().catch((err) => {

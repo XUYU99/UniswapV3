@@ -18,7 +18,8 @@ export var KOKOAddress: string,
   V3FactoryAddress: string,
   NFTDescriptorAddress: string,
   PositionDescriptorAddress: string,
-  NonfungiblePositionManagerAddress: string;
+  NonfungiblePositionManagerAddress: string,
+  SwapRouterAddress: string;
 export var poolAddress: string;
 export async function createAndinitPool() {
   const [deployer] = await ethers.getSigners();
@@ -33,8 +34,12 @@ export async function createAndinitPool() {
   KOKOAddress = await KOKO.getAddress();
   ACAddress = await AC.getAddress();
 
+  const WETHFactory = await ethers.getContractFactory("WETH", deployer);
+  const WETH = await WETHFactory.deploy();
+  const WETHAddress = await WETH.getAddress();
   console.log(`✅ KOKO Token 地址: ${KOKOAddress}`);
   console.log(`✅ AC Token 地址:   ${ACAddress}`);
+  console.log(`✅ WETH 地址:   ${WETHAddress}`);
 
   // // 部署 Mock WETH 合约
   // const WETHFactory = await ethers.getContractFactory("WETH", deployer);
@@ -96,26 +101,46 @@ export async function createAndinitPool() {
   NonfungiblePositionManagerAddress =
     await NonfungiblePositionManager.getAddress();
 
+  // 部署 SwapRouter
+  const SwapRouterFactory = await ethers.getContractFactory(
+    "SwapRouter",
+    deployer
+  );
+  const SwapRouter = await SwapRouterFactory.deploy(
+    V3FactoryAddress,
+    WETHAddress
+  );
+  await SwapRouter.waitForDeployment();
+  SwapRouterAddress = await SwapRouter.getAddress();
+
   console.log(`✅ Uniswap V3 Factory:  ${V3FactoryAddress}`);
   console.log(`✅ NFTDescriptor 地址:  ${NFTDescriptorAddress}`);
   console.log(`✅ PositionDescriptor:  ${PositionDescriptorAddress}`);
   console.log(
     `✅ NonfungiblePositionManager:     ${NonfungiblePositionManagerAddress}`
   );
+  console.log(`✅ SwapRouter 地址:  ${SwapRouterAddress}`);
 
-  // ✅ 创建并初始化池（可选）
+  // ✅ 创建并初始化池
+  // 通过 TickMath 对 tick 进行换算
+  const TickMathTestFactory = await ethers.getContractFactory(
+    "TickMathTest2",
+    deployer
+  );
+  const TickMathTest = await TickMathTestFactory.deploy();
+  await TickMathTest.waitForDeployment();
+  const TickMathTestAddress = await TickMathTest.getAddress();
+
+  console.log("TickMathTest deployed to:", TickMathTestAddress);
+  const sqrtPrice = await TickMathTest.getSqrtRatioAtTick(200);
+  console.log("sqrtNum:", sqrtPrice.toString());
+
   const fee = 3000; // 0.3%
-  const sqrtPriceX96 = BigInt("35430442183289009309045761674892"); // 200
-  // √1 = 1 → 2^96 = 79228162514264337593543950336 //即 2^96
+  const sqrtPriceX96 = BigInt(sqrtPrice); // 200
 
   const initPool_Tx = await NonfungiblePositionManager.connect(
     deployer
-  ).createAndInitializePoolIfNecessary(
-    KOKOAddress,
-    ACAddress,
-    fee,
-    sqrtPriceX96
-  );
+  ).createAndInitializePoolIfNecessary(KOKOAddress, ACAddress, fee, sqrtPrice);
 
   const receipt = await initPool_Tx.wait();
   poolAddress = await V3Factory.getPool(KOKOAddress, ACAddress, fee);

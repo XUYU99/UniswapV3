@@ -4,6 +4,8 @@ pragma solidity >=0.5.0;
 import "contracts/uniswap/v3-core/libraries/FullMath.sol";
 import "contracts/uniswap/v3-core/libraries/FixedPoint96.sol";
 
+// import "hardhat/console.sol";
+
 /// @title Liquidity amount functions
 /// @notice Provides functions for computing liquidity amounts from token amounts and prices
 library LiquidityAmounts {
@@ -60,6 +62,12 @@ library LiquidityAmounts {
     ) internal pure returns (uint128 liquidity) {
         if (sqrtRatioAX96 > sqrtRatioBX96)
             (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
+        // console.log(
+        //     "LiquidityAmount-getLiquidityForAmount1: ",
+        //     uint256(amount1),
+        //     uint256(sqrtRatioBX96),
+        //     uint256(sqrtRatioAX96)
+        // );
         return
             toUint128(
                 FullMath.mulDiv(
@@ -69,6 +77,36 @@ library LiquidityAmounts {
                 )
             );
     }
+
+    // xyt-test
+    // function getAmount1Delta(
+    //     uint160 sqrtRatioAX96,
+    //     uint160 sqrtRatioBX96,
+    //     uint128 liquidity,
+    //     bool roundUp
+    // ) internal pure returns (uint256 amount1) {
+    //     if (sqrtRatioAX96 > sqrtRatioBX96)
+    //         (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
+    //     amount1 = roundUp
+    //         ? FullMath.mulDivRoundingUp(
+    //             liquidity,
+    //             sqrtRatioBX96 - sqrtRatioAX96,
+    //             FixedPoint96.Q96
+    //         )
+    //         : FullMath.mulDiv(
+    //             liquidity,
+    //             sqrtRatioBX96 - sqrtRatioAX96,
+    //             FixedPoint96.Q96
+    //         );
+    //     console.log(
+    //         "LiquidityAmount-getAmount1Delta: ",
+    //         uint256(amount1),
+    //         uint256(sqrtRatioBX96),
+    //         uint256(sqrtRatioAX96)
+    //     );
+    //     return amount1;
+
+    // }
 
     /// @notice 基于给定的 token0、token1 数量、当前池子价格和 tick 边界价格，计算可获得的最大流动性
     /// @param sqrtRatioX96 A sqrt price representing the current pool prices
@@ -96,6 +134,12 @@ library LiquidityAmounts {
                 sqrtRatioBX96,
                 amount0
             );
+            // console.log(
+            //     "LiquidityAmount-liquidity-111: ",
+            //     uint256(sqrtRatioAX96),
+            //     uint256(sqrtRatioBX96),
+            //     uint256(liquidity)
+            // );
         }
         // 当前价格位于两个 tick 之间 → 同时用 token0 和 token1 提供流动性，取最小的那一侧
         else if (sqrtRatioX96 < sqrtRatioBX96) {
@@ -111,6 +155,11 @@ library LiquidityAmounts {
             );
 
             liquidity = liquidity0 < liquidity1 ? liquidity0 : liquidity1;
+            // console.log(
+            //     "LiquidityAmount-liquidity0-222: ",
+            //     uint256(liquidity0),
+            //     uint256(liquidity1)
+            // );
         }
         // 当前价格高于右边界 tick（价格在区间右边） → 只能用 token1 提供流动性
         else {

@@ -121,6 +121,7 @@ contract NonfungiblePositionManager is
     }
 
     /// @dev Caches a pool key
+    // 在 NFT 持仓记录中，直接存 address 会占 20 字节，而存 uint80 只占 10 字节，更节省 gas 与存储空间。可通过 poolId → poolKey → token0/token1/fee 快速反查出池子的关键参数，便于收益计算
     function cachePoolKey(
         address pool,
         PoolAddress.PoolKey memory poolKey
@@ -232,14 +233,17 @@ contract NonfungiblePositionManager is
         external
         payable
         override
-        checkDeadline(params.deadline)
+        checkDeadline(params.deadline) // 检查交易是否超过截止时间
         returns (uint128 liquidity, uint256 amount0, uint256 amount1)
     {
+        // 获取头寸信息（通过 tokenId 定位到 position）
         Position storage position = _positions[params.tokenId];
 
+        // 获取对应池子的 PoolKey（token0、token1、fee）
         PoolAddress.PoolKey memory poolKey = _poolIdToPoolKey[position.poolId];
 
         IUniswapV3Pool pool;
+        // 调用 addLiquidity 增加流动性，并计算所需的 token0 和 token1 数量
         (liquidity, amount0, amount1, pool) = addLiquidity(
             AddLiquidityParams({
                 token0: poolKey.token0,
@@ -251,17 +255,18 @@ contract NonfungiblePositionManager is
                 amount1Desired: params.amount1Desired,
                 amount0Min: params.amount0Min,
                 amount1Min: params.amount1Min,
-                recipient: address(this)
+                recipient: address(this) // 合约自身作为临时接收者
             })
         );
 
+        // 计算头寸的唯一标识 positionKey
         bytes32 positionKey = PositionKey.compute(
             address(this),
             position.tickLower,
             position.tickUpper
         );
 
-        // this is now updated to the current transaction
+        // 查询 pool 中该头寸的最新手续费增长快照
         (
             ,
             uint256 feeGrowthInside0LastX128,
@@ -270,6 +275,7 @@ contract NonfungiblePositionManager is
 
         ) = pool.positions(positionKey);
 
+        // 累加从上次更新以来应得的 token0 手续费
         position.tokensOwed0 += uint128(
             FullMath.mulDiv(
                 feeGrowthInside0LastX128 - position.feeGrowthInside0LastX128,
@@ -277,6 +283,8 @@ contract NonfungiblePositionManager is
                 FixedPoint128.Q128
             )
         );
+
+        // 累加从上次更新以来应得的 token1 手续费
         position.tokensOwed1 += uint128(
             FullMath.mulDiv(
                 feeGrowthInside1LastX128 - position.feeGrowthInside1LastX128,
@@ -285,10 +293,14 @@ contract NonfungiblePositionManager is
             )
         );
 
+        // 更新头寸的手续费增长快照
         position.feeGrowthInside0LastX128 = feeGrowthInside0LastX128;
         position.feeGrowthInside1LastX128 = feeGrowthInside1LastX128;
+
+        // 增加 position 的流动性记录
         position.liquidity += liquidity;
 
+        // 发出事件
         emit IncreaseLiquidity(params.tokenId, liquidity, amount0, amount1);
     }
 

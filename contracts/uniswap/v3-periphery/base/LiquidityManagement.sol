@@ -13,6 +13,8 @@ import "../libraries/LiquidityAmounts.sol";
 import "./PeripheryPayments.sol";
 import "./PeripheryImmutableState.sol";
 
+// import "hardhat/console.sol";
+
 /// @title Liquidity management functions
 /// @notice Internal functions for safely managing liquidity in Uniswap V3
 abstract contract LiquidityManagement is
@@ -72,18 +74,6 @@ abstract contract LiquidityManagement is
         });
 
         pool = IUniswapV3Pool(PoolAddress.computeAddress(factory, poolKey));
-        address factoryGetpool = IUniswapV3Factory(factory).getPool(
-            params.token0,
-            params.token1,
-            params.fee
-        );
-        // console.log(
-        //     "LiquidityManagement.addLiquidity-factoryGetpool- params.token0_ params.token1: ",
-        //     factoryGetpool,
-        //     params.token0,
-        //     params.token1
-        // );
-        // console.log("-params.fee: ", uint256(params.fee));
 
         // compute the liquidity amount
         {
@@ -103,6 +93,24 @@ abstract contract LiquidityManagement is
                 params.tickUpper
             );
 
+            // if (sqrtPriceX96 < sqrtRatioAX96) {
+            //     console.log(
+            //         "LiquidityManagement.addLiquidity-current < sqrtRatioAX96 "
+            //     );
+            // } else {
+            //     console.log(
+            //         "LiquidityManagement.addLiquidity-current > sqrtRatioAX96 "
+            //     );
+            // }
+            // if (sqrtPriceX96 < sqrtRatioBX96) {
+            //     console.log(
+            //         "LiquidityManagement.addLiquidity-current < sqrtRatioBX96 "
+            //     );
+            // } else {
+            //     console.log(
+            //         "LiquidityManagement.addLiquidity-current > sqrtRatioBX96 "
+            //     );
+            // }
             liquidity = LiquidityAmounts.getLiquidityForAmounts(
                 sqrtPriceX96,
                 sqrtRatioAX96,
@@ -110,6 +118,18 @@ abstract contract LiquidityManagement is
                 params.amount0Desired,
                 params.amount1Desired
             );
+
+            // console.log(
+            //     "LiquidityManagement.addLiquidity-sqrt: ",
+            //     uint256(liquidity)
+            // );
+            // xyt-test
+            // amount1 = LiquidityAmounts.getAmount1Delta(
+            //     sqrtRatioAX96,
+            //     sqrtRatioBX96,
+            //     liquidity,
+            //     false
+            // );
 
             // console.log(
             //     "LiquidityManagement.addLiquidity-liquidity: ",

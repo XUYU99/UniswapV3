@@ -18,7 +18,7 @@ import "./libraries/CallbackValidation.sol";
 import "./interfaces/external/IWETH9.sol";
 
 /// @title Uniswap V3 Swap Router
-/// @notice Router for stateless execution of swaps against Uniswap V3
+/// @notice 无状态执行 Uniswap V3 交易的路由器
 contract SwapRouter is
     ISwapRouter,
     PeripheryImmutableState,
@@ -30,11 +30,10 @@ contract SwapRouter is
     using Path for bytes;
     using SafeCast for uint256;
 
-    /// @dev Used as the placeholder value for amountInCached, because the computed amount in for an exact output swap
-    /// can never actually be this value
+    // 默认缓存值，用于精确输出交易时缓存输入金额
     uint256 private constant DEFAULT_AMOUNT_IN_CACHED = type(uint256).max;
 
-    /// @dev Transient storage variable used for returning the computed amount in for an exact output swap.
+    // 缓存变量，用于 exactOutput 交易中记录实际消耗的 tokenIn 数量
     uint256 private amountInCached = DEFAULT_AMOUNT_IN_CACHED;
 
     constructor(
@@ -42,7 +41,7 @@ contract SwapRouter is
         address _WETH9
     ) PeripheryImmutableState(_factory, _WETH9) {}
 
-    /// @dev Returns the pool for the given token pair and fee. The pool contract may or may not exist.
+    /// @dev 根据 token 对和手续费获取池地址
     function getPool(
         address tokenA,
         address tokenB,
@@ -58,57 +57,63 @@ contract SwapRouter is
     }
 
     struct SwapCallbackData {
-        bytes path;
-        address payer;
+        bytes path; // 路径编码（包括 tokenA、fee、tokenB）
+        address payer; // 付款地址
     }
 
     /// @inheritdoc IUniswapV3SwapCallback
+    /// @notice swap 操作的回调函数，在 swap 调用时由池合约调用此函数
     function uniswapV3SwapCallback(
         int256 amount0Delta,
         int256 amount1Delta,
         bytes calldata _data
     ) external override {
-        require(amount0Delta > 0 || amount1Delta > 0); // swaps entirely within 0-liquidity regions are not supported
+        require(amount0Delta > 0 || amount1Delta > 0, "Zero swap delta");
         SwapCallbackData memory data = abi.decode(_data, (SwapCallbackData));
         (address tokenIn, address tokenOut, uint24 fee) = data
             .path
             .decodeFirstPool();
+
+        // 校验调用者是否合法池合约
         CallbackValidation.verifyCallback(factory, tokenIn, tokenOut, fee);
 
+        // 判断支付方向
         (bool isExactInput, uint256 amountToPay) = amount0Delta > 0
             ? (tokenIn < tokenOut, uint256(amount0Delta))
             : (tokenOut < tokenIn, uint256(amount1Delta));
+
         if (isExactInput) {
+            // 精确输入：直接付款
             pay(tokenIn, data.payer, msg.sender, amountToPay);
         } else {
-            // either initiate the next swap or pay
+            // 精确输出逻辑
             if (data.path.hasMultiplePools()) {
+                // 多跳路径时，递归进行下一跳 exactOutputInternal
                 data.path = data.path.skipToken();
                 exactOutputInternal(amountToPay, msg.sender, 0, data);
             } else {
+                // 最后一跳，记录实际输入金额并付款
                 amountInCached = amountToPay;
-                tokenIn = tokenOut; // swap in/out because exact output swaps are reversed
+                tokenIn = tokenOut; // 因 exact output 是反向的
                 pay(tokenIn, data.payer, msg.sender, amountToPay);
             }
         }
     }
 
-    /// @dev Performs a single exact input swap
+    /// @dev 内部执行单次精确输入交易
     function exactInputInternal(
         uint256 amountIn,
         address recipient,
         uint160 sqrtPriceLimitX96,
         SwapCallbackData memory data
     ) private returns (uint256 amountOut) {
-        // allow swapping to the router address with address 0
         if (recipient == address(0)) recipient = address(this);
-
         (address tokenIn, address tokenOut, uint24 fee) = data
             .path
             .decodeFirstPool();
-
         bool zeroForOne = tokenIn < tokenOut;
 
+        // 调用池合约 swap 函数
         (int256 amount0, int256 amount1) = getPool(tokenIn, tokenOut, fee).swap(
             recipient,
             zeroForOne,
@@ -123,10 +128,12 @@ contract SwapRouter is
             abi.encode(data)
         );
 
+        // 计算实际收到的 tokenOut 数量（为正）
         return uint256(-(zeroForOne ? amount1 : amount0));
     }
 
     /// @inheritdoc ISwapRouter
+    /// @notice 精确输入单池交换
     function exactInputSingle(
         ExactInputSingleParams calldata params
     )
@@ -153,6 +160,7 @@ contract SwapRouter is
     }
 
     /// @inheritdoc ISwapRouter
+    /// @notice 精确输入多池交换（支持路径）
     function exactInput(
         ExactInputParams memory params
     )
@@ -162,49 +170,40 @@ contract SwapRouter is
         checkDeadline(params.deadline)
         returns (uint256 amountOut)
     {
-        address payer = msg.sender; // msg.sender pays for the first hop
-
+        address payer = msg.sender;
         while (true) {
             bool hasMultiplePools = params.path.hasMultiplePools();
-
-            // the outputs of prior swaps become the inputs to subsequent ones
             params.amountIn = exactInputInternal(
                 params.amountIn,
-                hasMultiplePools ? address(this) : params.recipient, // for intermediate swaps, this contract custodies
+                hasMultiplePools ? address(this) : params.recipient,
                 0,
                 SwapCallbackData({
-                    path: params.path.getFirstPool(), // only the first pool in the path is necessary
+                    path: params.path.getFirstPool(),
                     payer: payer
                 })
             );
-
-            // decide whether to continue or terminate
             if (hasMultiplePools) {
-                payer = address(this); // at this point, the caller has paid
+                payer = address(this);
                 params.path = params.path.skipToken();
             } else {
                 amountOut = params.amountIn;
                 break;
             }
         }
-
         require(amountOut >= params.amountOutMinimum, "Too little received");
     }
 
-    /// @dev Performs a single exact output swap
+    /// @dev 内部执行精确输出交易
     function exactOutputInternal(
         uint256 amountOut,
         address recipient,
         uint160 sqrtPriceLimitX96,
         SwapCallbackData memory data
     ) private returns (uint256 amountIn) {
-        // allow swapping to the router address with address 0
         if (recipient == address(0)) recipient = address(this);
-
         (address tokenOut, address tokenIn, uint24 fee) = data
             .path
             .decodeFirstPool();
-
         bool zeroForOne = tokenIn < tokenOut;
 
         (int256 amount0Delta, int256 amount1Delta) = getPool(
@@ -229,12 +228,12 @@ contract SwapRouter is
         (amountIn, amountOutReceived) = zeroForOne
             ? (uint256(amount0Delta), uint256(-amount1Delta))
             : (uint256(amount1Delta), uint256(-amount0Delta));
-        // it's technically possible to not receive the full output amount,
-        // so if no price limit has been specified, require this possibility away
+
         if (sqrtPriceLimitX96 == 0) require(amountOutReceived == amountOut);
     }
 
     /// @inheritdoc ISwapRouter
+    /// @notice 精确输出单池交换
     function exactOutputSingle(
         ExactOutputSingleParams calldata params
     )
@@ -244,7 +243,6 @@ contract SwapRouter is
         checkDeadline(params.deadline)
         returns (uint256 amountIn)
     {
-        // avoid an SLOAD by using the swap return data
         amountIn = exactOutputInternal(
             params.amountOut,
             params.recipient,
@@ -258,13 +256,12 @@ contract SwapRouter is
                 payer: msg.sender
             })
         );
-
         require(amountIn <= params.amountInMaximum, "Too much requested");
-        // has to be reset even though we don't use it in the single hop case
         amountInCached = DEFAULT_AMOUNT_IN_CACHED;
     }
 
     /// @inheritdoc ISwapRouter
+    /// @notice 精确输出多池交换（支持路径）
     function exactOutput(
         ExactOutputParams calldata params
     )
@@ -274,15 +271,12 @@ contract SwapRouter is
         checkDeadline(params.deadline)
         returns (uint256 amountIn)
     {
-        // it's okay that the payer is fixed to msg.sender here, as they're only paying for the "final" exact output
-        // swap, which happens first, and subsequent swaps are paid for within nested callback frames
         exactOutputInternal(
             params.amountOut,
             params.recipient,
             0,
             SwapCallbackData({path: params.path, payer: msg.sender})
         );
-
         amountIn = amountInCached;
         require(amountIn <= params.amountInMaximum, "Too much requested");
         amountInCached = DEFAULT_AMOUNT_IN_CACHED;

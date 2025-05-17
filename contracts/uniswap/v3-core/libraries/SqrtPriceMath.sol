@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity >=0.5.0;
 
-import './LowGasSafeMath.sol';
-import './SafeCast.sol';
+import "./LowGasSafeMath.sol";
+import "./SafeCast.sol";
 
-import './FullMath.sol';
-import './UnsafeMath.sol';
-import './FixedPoint96.sol';
+import "./FullMath.sol";
+import "./UnsafeMath.sol";
+import "./FixedPoint96.sol";
+
+// import "hardhat/console.sol";
 
 /// @title Functions based on Q64.96 sqrt price and liquidity
 /// @notice Contains the math that uses square root of price as a Q64.96 and liquidity to compute deltas
@@ -41,17 +43,36 @@ library SqrtPriceMath {
                 uint256 denominator = numerator1 + product;
                 if (denominator >= numerator1)
                     // always fits in 160 bits
-                    return uint160(FullMath.mulDivRoundingUp(numerator1, sqrtPX96, denominator));
+                    return
+                        uint160(
+                            FullMath.mulDivRoundingUp(
+                                numerator1,
+                                sqrtPX96,
+                                denominator
+                            )
+                        );
             }
 
-            return uint160(UnsafeMath.divRoundingUp(numerator1, (numerator1 / sqrtPX96).add(amount)));
+            return
+                uint160(
+                    UnsafeMath.divRoundingUp(
+                        numerator1,
+                        (numerator1 / sqrtPX96).add(amount)
+                    )
+                );
         } else {
             uint256 product;
             // if the product overflows, we know the denominator underflows
             // in addition, we must check that the denominator does not underflow
-            require((product = amount * sqrtPX96) / amount == sqrtPX96 && numerator1 > product);
+            require(
+                (product = amount * sqrtPX96) / amount == sqrtPX96 &&
+                    numerator1 > product
+            );
             uint256 denominator = numerator1 - product;
-            return FullMath.mulDivRoundingUp(numerator1, sqrtPX96, denominator).toUint160();
+            return
+                FullMath
+                    .mulDivRoundingUp(numerator1, sqrtPX96, denominator)
+                    .toUint160();
         }
     }
 
@@ -74,21 +95,26 @@ library SqrtPriceMath {
         // if we're adding (subtracting), rounding down requires rounding the quotient down (up)
         // in both cases, avoid a mulDiv for most inputs
         if (add) {
-            uint256 quotient =
-                (
-                    amount <= type(uint160).max
-                        ? (amount << FixedPoint96.RESOLUTION) / liquidity
-                        : FullMath.mulDiv(amount, FixedPoint96.Q96, liquidity)
-                );
+            uint256 quotient = (
+                amount <= type(uint160).max
+                    ? (amount << FixedPoint96.RESOLUTION) / liquidity
+                    : FullMath.mulDiv(amount, FixedPoint96.Q96, liquidity)
+            );
 
             return uint256(sqrtPX96).add(quotient).toUint160();
         } else {
-            uint256 quotient =
-                (
-                    amount <= type(uint160).max
-                        ? UnsafeMath.divRoundingUp(amount << FixedPoint96.RESOLUTION, liquidity)
-                        : FullMath.mulDivRoundingUp(amount, FixedPoint96.Q96, liquidity)
-                );
+            uint256 quotient = (
+                amount <= type(uint160).max
+                    ? UnsafeMath.divRoundingUp(
+                        amount << FixedPoint96.RESOLUTION,
+                        liquidity
+                    )
+                    : FullMath.mulDivRoundingUp(
+                        amount,
+                        FixedPoint96.Q96,
+                        liquidity
+                    )
+            );
 
             require(sqrtPX96 > quotient);
             // always fits 160 bits
@@ -115,8 +141,18 @@ library SqrtPriceMath {
         // round to make sure that we don't pass the target price
         return
             zeroForOne
-                ? getNextSqrtPriceFromAmount0RoundingUp(sqrtPX96, liquidity, amountIn, true)
-                : getNextSqrtPriceFromAmount1RoundingDown(sqrtPX96, liquidity, amountIn, true);
+                ? getNextSqrtPriceFromAmount0RoundingUp(
+                    sqrtPX96,
+                    liquidity,
+                    amountIn,
+                    true
+                )
+                : getNextSqrtPriceFromAmount1RoundingDown(
+                    sqrtPX96,
+                    liquidity,
+                    amountIn,
+                    true
+                );
     }
 
     /// @notice Gets the next sqrt price given an output amount of token0 or token1
@@ -138,38 +174,59 @@ library SqrtPriceMath {
         // round to make sure that we pass the target price
         return
             zeroForOne
-                ? getNextSqrtPriceFromAmount1RoundingDown(sqrtPX96, liquidity, amountOut, false)
-                : getNextSqrtPriceFromAmount0RoundingUp(sqrtPX96, liquidity, amountOut, false);
+                ? getNextSqrtPriceFromAmount1RoundingDown(
+                    sqrtPX96,
+                    liquidity,
+                    amountOut,
+                    false
+                )
+                : getNextSqrtPriceFromAmount0RoundingUp(
+                    sqrtPX96,
+                    liquidity,
+                    amountOut,
+                    false
+                );
     }
 
-    /// @notice Gets the amount0 delta between two prices
-    /// @dev Calculates liquidity / sqrt(lower) - liquidity / sqrt(upper),
-    /// i.e. liquidity * (sqrt(upper) - sqrt(lower)) / (sqrt(upper) * sqrt(lower))
-    /// @param sqrtRatioAX96 A sqrt price
-    /// @param sqrtRatioBX96 Another sqrt price
-    /// @param liquidity The amount of usable liquidity
-    /// @param roundUp Whether to round the amount up or down
-    /// @return amount0 Amount of token0 required to cover a position of size liquidity between the two passed prices
+    /// @notice 获取两个价格之间的 token0 差值（amount0 delta）
+    /// @dev 计算公式为 liquidity / sqrt(lower) - liquidity / sqrt(upper)，
+    /// 即 liquidity * (sqrt(upper) - sqrt(lower)) / (sqrt(upper) * sqrt(lower))
+    /// @param sqrtRatioAX96 一个平方根价格
+    /// @param sqrtRatioBX96 另一个平方根价格
+    /// @param liquidity 可用的流动性数量
+    /// @param roundUp 是否向上取整
+    /// @return amount0 在指定两个价格之间提供指定流动性所需的 token0 数量
     function getAmount0Delta(
         uint160 sqrtRatioAX96,
         uint160 sqrtRatioBX96,
         uint128 liquidity,
         bool roundUp
     ) internal pure returns (uint256 amount0) {
-        if (sqrtRatioAX96 > sqrtRatioBX96) (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
+        // 保证价格顺序从小到大
+        if (sqrtRatioAX96 > sqrtRatioBX96)
+            (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
 
+        // numerator1 = liquidity × 2^96（精度提升为 Q128.96）
         uint256 numerator1 = uint256(liquidity) << FixedPoint96.RESOLUTION;
+
+        // numerator2 = √P_upper - √P_lower
         uint256 numerator2 = sqrtRatioBX96 - sqrtRatioAX96;
 
         require(sqrtRatioAX96 > 0);
 
+        // 最终计算：如果向上取整
         return
             roundUp
                 ? UnsafeMath.divRoundingUp(
-                    FullMath.mulDivRoundingUp(numerator1, numerator2, sqrtRatioBX96),
+                    FullMath.mulDivRoundingUp(
+                        numerator1,
+                        numerator2,
+                        sqrtRatioBX96
+                    ),
                     sqrtRatioAX96
-                )
-                : FullMath.mulDiv(numerator1, numerator2, sqrtRatioBX96) / sqrtRatioAX96;
+                ) // 否则普通计算
+                : FullMath.mulDiv(numerator1, numerator2, sqrtRatioBX96) /
+                    sqrtRatioAX96;
     }
 
     /// @notice Gets the amount1 delta between two prices
@@ -185,12 +242,21 @@ library SqrtPriceMath {
         uint128 liquidity,
         bool roundUp
     ) internal pure returns (uint256 amount1) {
-        if (sqrtRatioAX96 > sqrtRatioBX96) (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
+        if (sqrtRatioAX96 > sqrtRatioBX96)
+            (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
 
         return
             roundUp
-                ? FullMath.mulDivRoundingUp(liquidity, sqrtRatioBX96 - sqrtRatioAX96, FixedPoint96.Q96)
-                : FullMath.mulDiv(liquidity, sqrtRatioBX96 - sqrtRatioAX96, FixedPoint96.Q96);
+                ? FullMath.mulDivRoundingUp(
+                    liquidity,
+                    sqrtRatioBX96 - sqrtRatioAX96,
+                    FixedPoint96.Q96
+                )
+                : FullMath.mulDiv(
+                    liquidity,
+                    sqrtRatioBX96 - sqrtRatioAX96,
+                    FixedPoint96.Q96
+                );
     }
 
     /// @notice Helper that gets signed token0 delta
@@ -205,8 +271,18 @@ library SqrtPriceMath {
     ) internal pure returns (int256 amount0) {
         return
             liquidity < 0
-                ? -getAmount0Delta(sqrtRatioAX96, sqrtRatioBX96, uint128(-liquidity), false).toInt256()
-                : getAmount0Delta(sqrtRatioAX96, sqrtRatioBX96, uint128(liquidity), true).toInt256();
+                ? -getAmount0Delta(
+                    sqrtRatioAX96,
+                    sqrtRatioBX96,
+                    uint128(-liquidity),
+                    false
+                ).toInt256() //false是判断要不要向上取整：添加流动性 → 向上取整，保证用户多付一点；移除流动性 → 向下取整，防止系统多给；
+                : getAmount0Delta(
+                    sqrtRatioAX96,
+                    sqrtRatioBX96,
+                    uint128(liquidity),
+                    true
+                ).toInt256();
     }
 
     /// @notice Helper that gets signed token1 delta
@@ -221,7 +297,17 @@ library SqrtPriceMath {
     ) internal pure returns (int256 amount1) {
         return
             liquidity < 0
-                ? -getAmount1Delta(sqrtRatioAX96, sqrtRatioBX96, uint128(-liquidity), false).toInt256()
-                : getAmount1Delta(sqrtRatioAX96, sqrtRatioBX96, uint128(liquidity), true).toInt256();
+                ? -getAmount1Delta(
+                    sqrtRatioAX96,
+                    sqrtRatioBX96,
+                    uint128(-liquidity),
+                    false
+                ).toInt256()
+                : getAmount1Delta(
+                    sqrtRatioAX96,
+                    sqrtRatioBX96,
+                    uint128(liquidity),
+                    true
+                ).toInt256();
     }
 }
