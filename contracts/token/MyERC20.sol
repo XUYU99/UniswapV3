@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract MyERC20 is ERC20, Ownable {
     constructor(string memory name, string memory symbol) ERC20(name, symbol) {
-        mint(msg.sender, 10000); // 给部署者地址铸造 100 个代币
+        mint(msg.sender, 10000); // 给部署者地址铸造 10000 个代币
         transferOwnership(msg.sender);
     }
 

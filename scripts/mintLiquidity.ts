@@ -1,5 +1,5 @@
 import { ethers } from "hardhat";
-import { parseEther, parseUnits, Contract } from "ethers";
+import { parseEther, parseUnits, formatUnits, Contract } from "ethers";
 import {
   formatBytes32String,
   parseBytes32String,
@@ -18,6 +18,8 @@ import {
   NonfungiblePositionManagerAddress,
   poolAddress,
 } from "./createAndinitPool";
+
+import { TickBitmapTestAddress } from "./createTest";
 
 export async function mintLiquidity() {
   console.log(
@@ -77,7 +79,7 @@ export async function mintLiquidity() {
   const fee = 3000;
   const amount0Min = 0; // slippage下限
   const amount1Min = 0;
-  const tickLower = -300; // tick 区间下限 !!! tick 要是 spacing 的倍数
+  const tickLower = 120; // tick 区间下限 !!! tick 要是 spacing 的倍数
   const tickUpper = 300; // tick 区间上限
   const deadline = Math.floor(Date.now() / 1000) + 60 * 10; // 当前时间 + 10 分钟
   // 调用 mint() 创建流动性头寸并铸造 LP NFT
@@ -109,8 +111,8 @@ export async function mintLiquidity() {
             ({ tokenId, liquidity, amount0, amount1 } = parsed.args);
             console.log("Token ID:", tokenId.toString());
             console.log("Liquidity:", liquidity.toString());
-            console.log("amount0:", amount0.toString());
-            console.log("amount1:", amount1.toString());
+            console.log("amount0:", formatUnits(amount0, 18).toString());
+            console.log("amount1:", formatUnits(amount1, 18).toString());
           }
         }
       } catch (e) {
@@ -149,7 +151,25 @@ export async function mintLiquidity() {
     });
 
     console.log("✅ mintLiquidity successfull.");
-
+    const TickBitmapTest = await ethers.getContractAt(
+      "TickBitmapTest",
+      TickBitmapTestAddress
+    );
+    const isInitialized = await TickBitmapTest.isInitialized2(
+      tickLower,
+      60,
+      poolAddress
+    );
+    console.log("nextInfo:", isInitialized.toString());
+    const tickInfoLower = await pool.ticks(tickLower);
+    const tickInfoUpper = await pool.ticks(tickUpper);
+    if (tickInfoLower.liquidityGross > 0 || tickInfoUpper.liquidityGross > 0) {
+      console.log(
+        "✅ tick 已成功初始化",
+        tickInfoLower.liquidityGross.toString(),
+        tickInfoUpper.liquidityGross.toString()
+      );
+    }
     console.log(
       "mint后： accountA AC币余额 :",
       (await AC.balanceOf(deployerAddress)).toString()

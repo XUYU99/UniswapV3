@@ -6,6 +6,11 @@ import {
 } from "@ethersproject/strings";
 
 import dotenv from "dotenv";
+import {
+  TickBitmapTestAddress,
+  SwapMathTestAddress,
+  TickMathTestAddress,
+} from "./createTest";
 dotenv.config();
 // export let KOKOAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
 // export let ACAddress = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512";
@@ -21,6 +26,7 @@ export var KOKOAddress: string,
   NonfungiblePositionManagerAddress: string,
   SwapRouterAddress: string;
 export var poolAddress: string;
+
 export async function createAndinitPool() {
   const [deployer] = await ethers.getSigners();
   console.log("Deployer:", deployer.address);
@@ -113,6 +119,22 @@ export async function createAndinitPool() {
   await SwapRouter.waitForDeployment();
   SwapRouterAddress = await SwapRouter.getAddress();
 
+  // 实例化TickBitmap
+  // const TickBitmapTestFactory = await ethers.getContractFactory(
+  //   "TickBitmapTest",
+  //   deployer
+  // );
+  // const TickBitmapTest = await TickBitmapTestFactory.deploy();
+  // await TickBitmapTest.waitForDeployment();
+  // TickBitmapTestAddress = await TickBitmapTest.getAddress();
+
+  // const SwapMathTestFactory = await ethers.getContractFactory(
+  //   "TickBitmapTest",
+  //   deployer
+  // );
+  // const SwapMathTest = await SwapMathTestFactory.deploy();
+  // await SwapMathTest.waitForDeployment();
+  // SwapMathTestAddress = await SwapMathTest.getAddress();
   console.log(`✅ Uniswap V3 Factory:  ${V3FactoryAddress}`);
   console.log(`✅ NFTDescriptor 地址:  ${NFTDescriptorAddress}`);
   console.log(`✅ PositionDescriptor:  ${PositionDescriptorAddress}`);
@@ -120,27 +142,38 @@ export async function createAndinitPool() {
     `✅ NonfungiblePositionManager:     ${NonfungiblePositionManagerAddress}`
   );
   console.log(`✅ SwapRouter 地址:  ${SwapRouterAddress}`);
-
+  // console.log("✅ TickBitmapTest 地址:", TickBitmapTestAddress);
+  // console.log("✅ SwapMathTest 地址:", SwapMathTestAddress);
   // ✅ 创建并初始化池
-  // 通过 TickMath 对 tick 进行换算
-  const TickMathTestFactory = await ethers.getContractFactory(
-    "TickMathTest2",
-    deployer
-  );
-  const TickMathTest = await TickMathTestFactory.deploy();
-  await TickMathTest.waitForDeployment();
-  const TickMathTestAddress = await TickMathTest.getAddress();
 
-  console.log("TickMathTest deployed to:", TickMathTestAddress);
+  // 通过 TickMath 对 tick 进行换算
+  // const TickMathTestFactory = await ethers.getContractFactory(
+  //   "TickMathTest2",
+  //   deployer
+  // );
+  // const TickMathTest = await TickMathTestFactory.deploy();
+  // await TickMathTest.waitForDeployment();
+  // TickMathTestAddress = await TickMathTest.getAddress();
+
+  // console.log("TickMathTest deployed to:", TickMathTestAddress);
+  const TickMathTest = await ethers.getContractAt(
+    "TickMathTest",
+    TickMathTestAddress
+  );
   const sqrtPrice = await TickMathTest.getSqrtRatioAtTick(200);
-  console.log("sqrtNum:", sqrtPrice.toString());
+  console.log("sqrtPrice:", sqrtPrice.toString());
 
   const fee = 3000; // 0.3%
   const sqrtPriceX96 = BigInt(sqrtPrice); // 200
 
   const initPool_Tx = await NonfungiblePositionManager.connect(
     deployer
-  ).createAndInitializePoolIfNecessary(KOKOAddress, ACAddress, fee, sqrtPrice);
+  ).createAndInitializePoolIfNecessary(
+    KOKOAddress,
+    ACAddress,
+    fee,
+    sqrtPriceX96
+  );
 
   const receipt = await initPool_Tx.wait();
   poolAddress = await V3Factory.getPool(KOKOAddress, ACAddress, fee);

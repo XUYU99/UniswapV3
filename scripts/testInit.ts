@@ -7,13 +7,13 @@ import {
 
 import dotenv from "dotenv";
 dotenv.config();
-
+import { createTest } from "./createTest";
 import { createAndinitPool } from "./createAndinitPool";
 import { mintLiquidity } from "./mintLiquidity";
 import { addLiquidity } from "./addLiquidity";
 import { swapExactInputSingle } from "./swap";
 async function TestInit() {
-  const [deployer] = await ethers.getSigners();
+  await createTest();
 
   // 调用 createAndinitPool 函数
   await createAndinitPool();
@@ -23,7 +23,7 @@ async function TestInit() {
 
   await addLiquidity();
 
-  // await swapExactInputSingle();
+  await swapExactInputSingle();
 }
 
 TestInit().catch((err) => {

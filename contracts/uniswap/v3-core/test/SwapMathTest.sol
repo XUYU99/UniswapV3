@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity =0.7.6;
 
-import '../libraries/SwapMath.sol';
+import "../libraries/SwapMath.sol";
 
 contract SwapMathTest {
     function computeSwapStep(
@@ -20,7 +20,14 @@ contract SwapMathTest {
             uint256 feeAmount
         )
     {
-        return SwapMath.computeSwapStep(sqrtP, sqrtPTarget, liquidity, amountRemaining, feePips);
+        return
+            SwapMath.computeSwapStep(
+                sqrtP,
+                sqrtPTarget,
+                liquidity,
+                amountRemaining,
+                feePips
+            );
     }
 
     function getGasCostOfComputeSwapStep(
@@ -31,7 +38,13 @@ contract SwapMathTest {
         uint24 feePips
     ) external view returns (uint256) {
         uint256 gasBefore = gasleft();
-        SwapMath.computeSwapStep(sqrtP, sqrtPTarget, liquidity, amountRemaining, feePips);
+        SwapMath.computeSwapStep(
+            sqrtP,
+            sqrtPTarget,
+            liquidity,
+            amountRemaining,
+            feePips
+        );
         return gasBefore - gasleft();
     }
 }

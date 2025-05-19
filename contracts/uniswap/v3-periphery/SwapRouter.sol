@@ -17,6 +17,8 @@ import "./libraries/PoolAddress.sol";
 import "./libraries/CallbackValidation.sol";
 import "./interfaces/external/IWETH9.sol";
 
+import "hardhat/console.sol";
+
 /// @title Uniswap V3 Swap Router
 /// @notice 无状态执行 Uniswap V3 交易的路由器
 contract SwapRouter is
@@ -68,6 +70,14 @@ contract SwapRouter is
         int256 amount1Delta,
         bytes calldata _data
     ) external override {
+        // console.log(
+        //     "SwapRouter-uniswapV3SwapCallback()-amount0Delta: %s, amount1Delta: %s",
+        //     uint256(amount0Delta),
+        //     uint256(amount1Delta)
+        // );
+        console.log("SwapRouter-uniswapV3SwapCallback()");
+        console.logInt(amount0Delta);
+        console.logInt(amount1Delta);
         require(amount0Delta > 0 || amount1Delta > 0, "Zero swap delta");
         SwapCallbackData memory data = abi.decode(_data, (SwapCallbackData));
         (address tokenIn, address tokenOut, uint24 fee) = data
@@ -107,12 +117,18 @@ contract SwapRouter is
         uint160 sqrtPriceLimitX96,
         SwapCallbackData memory data
     ) private returns (uint256 amountOut) {
+        // console.log("SwapRouter-exactInputInternal()-111");
         if (recipient == address(0)) recipient = address(this);
         (address tokenIn, address tokenOut, uint24 fee) = data
             .path
             .decodeFirstPool();
         bool zeroForOne = tokenIn < tokenOut;
-
+        // console.log(
+        //     "SwapRouter-exactInputInternal()-tokenIn",
+        //     address(tokenIn),
+        //     address(tokenOut),
+        //     bool(zeroForOne)
+        // );
         // 调用池合约 swap 函数
         (int256 amount0, int256 amount1) = getPool(tokenIn, tokenOut, fee).swap(
             recipient,
@@ -127,6 +143,13 @@ contract SwapRouter is
                 : sqrtPriceLimitX96,
             abi.encode(data)
         );
+        console.log(
+            "SwapRouter-exactInputInternal()-tokenIn",
+            uint256(amount0),
+            uint256(amount1),
+            bool(zeroForOne)
+        );
+        // console.log("SwapRouter-exactInputInternal()-222");
 
         // 计算实际收到的 tokenOut 数量（为正）
         return uint256(-(zeroForOne ? amount1 : amount0));
@@ -143,6 +166,7 @@ contract SwapRouter is
         checkDeadline(params.deadline)
         returns (uint256 amountOut)
     {
+        // console.log("SwapRouter-exactInputSingle()-111");
         amountOut = exactInputInternal(
             params.amountIn,
             params.recipient,

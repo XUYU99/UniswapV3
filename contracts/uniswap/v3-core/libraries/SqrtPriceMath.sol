@@ -202,6 +202,7 @@ library SqrtPriceMath {
         uint128 liquidity,
         bool roundUp
     ) internal pure returns (uint256 amount0) {
+        // amount0 = liquidity × 2^{96} × (√P_upper − √P_current) /  √P_upper × √P_current
         // 保证价格顺序从小到大
         if (sqrtRatioAX96 > sqrtRatioBX96)
             (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
