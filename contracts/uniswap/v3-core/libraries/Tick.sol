@@ -185,15 +185,6 @@ library Tick {
         delete self[tick];
     }
 
-    /// @notice 当价格穿越 tick 时调用，用于反转 tick 外侧记录值
-    /// @param self 所有已初始化 tick 的映射
-    /// @param tick 被穿越的 tick
-    /// @param feeGrowthGlobal0X128 当前全局手续费累计值（token0）
-    /// @param feeGrowthGlobal1X128 当前全局手续费累计值（token1）
-    /// @param secondsPerLiquidityCumulativeX128 当前 seconds/liquidity 累计值
-    /// @param tickCumulative 当前 tick 累积值
-    /// @param time 当前时间戳
-    /// @return liquidityNet 跨越 tick 时需要变动的流动性值
     function cross(
         mapping(int24 => Tick.Info) storage self,
         int24 tick,
@@ -203,20 +194,38 @@ library Tick {
         int56 tickCumulative,
         uint32 time
     ) internal returns (int128 liquidityNet) {
+        // 获取 tick 对应的结构体信息
         Tick.Info storage info = self[tick];
+
+        // 以下四项操作是“反转 outside”，用于后续计算 inside 区域时方便
+        // 因为 crossing tick 表示 inside/outside 的角色互换
+
+        // 反转该 tick 的 token0 手续费增长（用于 inside 计算）
         info.feeGrowthOutside0X128 =
             feeGrowthGlobal0X128 -
             info.feeGrowthOutside0X128;
+
+        // 反转该 tick 的 token1 手续费增长
         info.feeGrowthOutside1X128 =
             feeGrowthGlobal1X128 -
             info.feeGrowthOutside1X128;
+
+        // 反转 secondsPerLiquidity（秒数 / 流动性）用于时间加权计算
         info.secondsPerLiquidityOutsideX128 =
             secondsPerLiquidityCumulativeX128 -
             info.secondsPerLiquidityOutsideX128;
+
+        // 反转 tick 累积值（用于 TWAP 均值计算）
         info.tickCumulativeOutside =
             tickCumulative -
             info.tickCumulativeOutside;
+
+        // 更新 secondsOutside：当前时间戳减去记录的值，表示该 tick 曾经在 outside 的总时长
         info.secondsOutside = time - info.secondsOutside;
+
+        // 返回该 tick 的 liquidityNet，用于全局 liquidity 更新：
+        // - 如果是价格从左向右穿越 tick，表示 tick liquidity 被激活，要加上；
+        // - 如果是从右向左穿越，表示 tick liquidity 被移除，要减去。
         liquidityNet = info.liquidityNet;
     }
 }

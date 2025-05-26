@@ -13,7 +13,7 @@ import "../libraries/LiquidityAmounts.sol";
 import "./PeripheryPayments.sol";
 import "./PeripheryImmutableState.sol";
 
-// import "hardhat/console.sol";
+import "hardhat/console.sol";
 
 /// @title Liquidity management functions
 /// @notice Internal functions for safely managing liquidity in Uniswap V3
@@ -120,20 +120,32 @@ abstract contract LiquidityManagement is
             );
 
             // console.log(
-            //     "LiquidityManagement.addLiquidity-sqrt: ",
+            //     "LiquidityManagement-addLiquidity()-sqrtPriceX96,sqrtRatioAX96,sqrtRatioBX96,liquidity: ",
+            //     uint256(sqrtRatioAX96),
+            //     uint256(sqrtRatioBX96)
+            // );
+            // console.log(
+            //     "LiquidityManagement-addLiquidity()-sqrtPriceX96,liquidity: ",
+            //     uint256(sqrtPriceX96),
             //     uint256(liquidity)
             // );
-            // xyt-test
-            // amount1 = LiquidityAmounts.getAmount1Delta(
-            //     sqrtRatioAX96,
+            // xyt-test 输出amount0,amount1
+            // amount0 = LiquidityAmounts.getAmount0Delta(
+            //     sqrtPriceX96,
             //     sqrtRatioBX96,
             //     liquidity,
-            //     false
+            //     true
+            // );
+            // amount1 = LiquidityAmounts.getAmount1Delta(
+            //     sqrtRatioAX96,
+            //     sqrtPriceX96,
+            //     liquidity,
+            //     true
             // );
 
             // console.log(
-            //     "LiquidityManagement.addLiquidity-liquidity: ",
-            //     uint256(liquidity)
+            //     "LiquidityManagement.addLiquidity-amount: ",
+            //     uint256(amount1)
             // );
         }
 

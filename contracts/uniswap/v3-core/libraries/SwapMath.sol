@@ -49,7 +49,6 @@ library SwapMath {
                 1e6
             );
 
-            // 计算若价格正好推进到目标位置所需的最大输入
             amountIn = zeroForOne
                 ? SqrtPriceMath.getAmount0Delta(
                     sqrtRatioTargetX96,
@@ -90,11 +89,9 @@ library SwapMath {
                     false
                 );
 
-            // 如果目标输出在当前范围内可满足
             if (uint256(-amountRemaining) >= amountOut) {
                 sqrtRatioNextX96 = sqrtRatioTargetX96;
             } else {
-                // 输出不足，反推需要的价格推进
                 sqrtRatioNextX96 = SqrtPriceMath.getNextSqrtPriceFromOutput(
                     sqrtRatioCurrentX96,
                     liquidity,

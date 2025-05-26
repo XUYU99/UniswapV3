@@ -75,9 +75,9 @@ contract SwapRouter is
         //     uint256(amount0Delta),
         //     uint256(amount1Delta)
         // );
-        console.log("SwapRouter-uniswapV3SwapCallback()");
-        console.logInt(amount0Delta);
-        console.logInt(amount1Delta);
+        // console.log("SwapRouter-uniswapV3SwapCallback()");
+        // console.logInt(amount0Delta);
+        // console.logInt(amount1Delta);
         require(amount0Delta > 0 || amount1Delta > 0, "Zero swap delta");
         SwapCallbackData memory data = abi.decode(_data, (SwapCallbackData));
         (address tokenIn, address tokenOut, uint24 fee) = data

@@ -1,9 +1,5 @@
 import { ethers } from "hardhat";
 import { parseEther, parseUnits, formatUnits, Contract } from "ethers";
-import {
-  formatBytes32String,
-  parseBytes32String,
-} from "@ethersproject/strings";
 
 import dotenv from "dotenv";
 dotenv.config();
@@ -62,8 +58,12 @@ export async function mintLiquidity() {
   await AC.approve(NonfungiblePositionManagerAddress, amount1Desired);
   // 查看余额
   console.log(
-    "mint前： accountA AC币余额 :",
-    (await AC.balanceOf(deployerAddress)).toString()
+    "mint 前: accountA KOKO 币余额 :",
+    formatUnits(await KOKO.balanceOf(deployerAddress), 18).toString()
+  );
+  console.log(
+    "mint 前: aaccountA AC币余额 :",
+    formatUnits(await AC.balanceOf(deployerAddress), 18).toString()
   );
   // （可选）获取池子合约地址并确认是否已部署
   // const V3Factory = await ethers.getContractAt(
@@ -171,8 +171,12 @@ export async function mintLiquidity() {
       );
     }
     console.log(
-      "mint后： accountA AC币余额 :",
-      (await AC.balanceOf(deployerAddress)).toString()
+      "mint 后: accountA KOKO 币余额 :",
+      formatUnits(await KOKO.balanceOf(deployerAddress), 18).toString()
+    );
+    console.log(
+      "mint 后: accountA AC 币余额 :",
+      formatUnits(await AC.balanceOf(deployerAddress), 18).toString()
     );
   }
 }

@@ -14,3 +14,4 @@ npx hardhat ignition deploy ./ignition/modules/Lock.ts
 
 yarn hardhat run scripts/createAndinitPool.ts --network localhost
 yarn hardhat run scripts/mintLiquidity.ts --network localhost
+yarn hardhat run scripts/testInit.ts --network hardhat

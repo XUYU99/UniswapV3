@@ -160,11 +160,13 @@ export async function createAndinitPool() {
     "TickMathTest",
     TickMathTestAddress
   );
-  const sqrtPrice = await TickMathTest.getSqrtRatioAtTick(200);
+  // 设置 初始 tick = 400
+  const TickInit = 200;
+  const sqrtPrice = await TickMathTest.getSqrtRatioAtTick(TickInit);
   console.log("sqrtPrice:", sqrtPrice.toString());
 
   const fee = 3000; // 0.3%
-  const sqrtPriceX96 = BigInt(sqrtPrice); // 200
+  const sqrtPriceX96 = BigInt(sqrtPrice);
 
   const initPool_Tx = await NonfungiblePositionManager.connect(
     deployer

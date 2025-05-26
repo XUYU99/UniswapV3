@@ -2,9 +2,10 @@
 pragma solidity >=0.5.0;
 
 import "contracts/uniswap/v3-core/libraries/FullMath.sol";
+import "contracts/uniswap/v3-core/libraries/UnsafeMath.sol";
 import "contracts/uniswap/v3-core/libraries/FixedPoint96.sol";
 
-// import "hardhat/console.sol";
+import "hardhat/console.sol";
 
 /// @title Liquidity amount functions
 /// @notice Provides functions for computing liquidity amounts from token amounts and prices
@@ -79,34 +80,73 @@ library LiquidityAmounts {
     }
 
     // xyt-test
-    // function getAmount1Delta(
-    //     uint160 sqrtRatioAX96,
-    //     uint160 sqrtRatioBX96,
-    //     uint128 liquidity,
-    //     bool roundUp
-    // ) internal pure returns (uint256 amount1) {
-    //     if (sqrtRatioAX96 > sqrtRatioBX96)
-    //         (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
-    //     amount1 = roundUp
-    //         ? FullMath.mulDivRoundingUp(
-    //             liquidity,
-    //             sqrtRatioBX96 - sqrtRatioAX96,
-    //             FixedPoint96.Q96
-    //         )
-    //         : FullMath.mulDiv(
-    //             liquidity,
-    //             sqrtRatioBX96 - sqrtRatioAX96,
-    //             FixedPoint96.Q96
-    //         );
-    //     console.log(
-    //         "LiquidityAmount-getAmount1Delta: ",
-    //         uint256(amount1),
-    //         uint256(sqrtRatioBX96),
-    //         uint256(sqrtRatioAX96)
-    //     );
-    //     return amount1;
 
-    // }
+    function getAmount0Delta(
+        uint160 sqrtRatioAX96,
+        uint160 sqrtRatioBX96,
+        uint128 liquidity,
+        bool roundUp
+    ) internal pure returns (uint256 amount0) {
+        // amount0 = liquidity × 2^{96} × (√P_upper − √P_current) /  √P_upper × √P_current
+        // 保证价格顺序从小到大
+        if (sqrtRatioAX96 > sqrtRatioBX96)
+            (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
+
+        // numerator1 = liquidity × 2^96（精度提升为 Q128.96）
+        uint256 numerator1 = uint256(liquidity) << FixedPoint96.RESOLUTION;
+
+        // numerator2 = √P_upper - √P_lower
+        uint256 numerator2 = sqrtRatioBX96 - sqrtRatioAX96;
+
+        require(sqrtRatioAX96 > 0);
+        amount0 = roundUp
+            ? UnsafeMath.divRoundingUp(
+                FullMath.mulDivRoundingUp(
+                    numerator1,
+                    numerator2,
+                    sqrtRatioBX96
+                ),
+                sqrtRatioAX96
+            ) // 否则普通计算
+            : FullMath.mulDiv(numerator1, numerator2, sqrtRatioBX96) /
+                sqrtRatioAX96;
+        // console.log(
+        //     "LiquidityAmounts-getAmount0Delta: ",
+        //     uint256(amount0),
+        //     uint256(sqrtRatioBX96),
+        //     uint256(sqrtRatioAX96)
+        // );
+        // 最终计算：如果向上取整
+        return amount0;
+    }
+
+    function getAmount1Delta(
+        uint160 sqrtRatioAX96,
+        uint160 sqrtRatioBX96,
+        uint128 liquidity,
+        bool roundUp
+    ) internal pure returns (uint256 amount1) {
+        if (sqrtRatioAX96 > sqrtRatioBX96)
+            (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
+        amount1 = roundUp
+            ? FullMath.mulDivRoundingUp(
+                liquidity,
+                sqrtRatioBX96 - sqrtRatioAX96,
+                FixedPoint96.Q96
+            )
+            : FullMath.mulDiv(
+                liquidity,
+                sqrtRatioBX96 - sqrtRatioAX96,
+                FixedPoint96.Q96
+            );
+        // console.log(
+        //     "LiquidityAmounts-getAmount1Delta: ",
+        //     uint256(amount1),
+        //     uint256(sqrtRatioBX96),
+        //     uint256(sqrtRatioAX96)
+        // );
+        return amount1;
+    }
 
     /// @notice 基于给定的 token0、token1 数量、当前池子价格和 tick 边界价格，计算可获得的最大流动性
     /// @param sqrtRatioX96 A sqrt price representing the current pool prices

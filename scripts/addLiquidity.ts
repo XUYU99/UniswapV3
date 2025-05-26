@@ -1,4 +1,5 @@
 import { ethers } from "hardhat";
+import { parseEther, parseUnits, formatUnits, Contract } from "ethers";
 
 import dotenv from "dotenv";
 dotenv.config();
@@ -14,7 +15,7 @@ import {
   poolAddress,
 } from "./createAndinitPool";
 
-export async function addLiquidity() {
+export async function addLiquidity(tickLower: number, tickUpper: number) {
   console.log(
     "----------------------------- add liquidity --------------------------------"
   );
@@ -54,8 +55,12 @@ export async function addLiquidity() {
   await KOKO.approve(NonfungiblePositionManagerAddress, amount0Desired);
   await AC.approve(NonfungiblePositionManagerAddress, amount1Desired);
   console.log(
-    "add前： accountA AC币余额 :",
-    (await AC.balanceOf(deployerAddress)).toString()
+    "add 前: accountA KOKO 币余额 :",
+    formatUnits(await KOKO.balanceOf(deployerAddress), 18).toString()
+  );
+  console.log(
+    "add 前: aaccountA AC币余额 :",
+    formatUnits(await AC.balanceOf(deployerAddress), 18).toString()
   );
 
   // --------------------- 2、 add liquidity ----------------------
@@ -63,8 +68,8 @@ export async function addLiquidity() {
   const fee = 3000;
   const amount0Min = 0; // slippage下限
   const amount1Min = 0;
-  const tickLower = 600; // tick 区间下限
-  const tickUpper = 900; // tick 区间上限
+  // const tickLower = 600; // tick 区间下限
+  // const tickUpper = 900; // tick 区间上限
   const deadline = Math.floor(Date.now() / 1000) + 60 * 10; // 当前时间 + 10 分钟
   // 调用 mint() 创建流动性头寸并铸造 LP NFT
   const tx = await NonfungiblePositionManager.mint({
@@ -95,8 +100,8 @@ export async function addLiquidity() {
             ({ tokenId, liquidity, amount0, amount1 } = parsed.args);
             console.log("Token ID:", tokenId.toString());
             console.log("Liquidity:", liquidity.toString());
-            console.log("amount0:", amount0.toString());
-            console.log("amount1:", amount1.toString());
+            console.log("amount0:", formatUnits(amount0, 18).toString());
+            console.log("amount1:", formatUnits(amount1, 18).toString());
           }
         }
       } catch (e) {
@@ -135,10 +140,13 @@ export async function addLiquidity() {
     });
 
     console.log("✅ addLiquidity successfull.");
-
     console.log(
-      "add 后： accountA AC币余额 :",
-      (await AC.balanceOf(deployerAddress)).toString()
+      "add 后: accountA KOKO 币余额 :",
+      formatUnits(await KOKO.balanceOf(deployerAddress), 18).toString()
+    );
+    console.log(
+      "add 后: accountA AC 币余额 :",
+      formatUnits(await AC.balanceOf(deployerAddress), 18).toString()
     );
   }
 }

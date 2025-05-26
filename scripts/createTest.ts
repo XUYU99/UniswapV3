@@ -8,7 +8,8 @@ export var SqrtPriceMathTestAddress: string,
   TickBitmapTestAddress: string,
   SwapMathTestAddress: string,
   TickMathTestAddress: string,
-  TestUniswapV3RouterAddress: string;
+  TestUniswapV3RouterAddress: string,
+  FullMathTestAddress: string;
 export async function createTest() {
   const [deployer] = await ethers.getSigners();
   console.log("Deployer:", deployer.address);
@@ -56,9 +57,18 @@ export async function createTest() {
   await TestUniswapV3Router.waitForDeployment();
   TestUniswapV3RouterAddress = await TestUniswapV3Router.getAddress();
 
+  // 实例化 FullMathTest
+  const FullMathTestFactory = await ethers.getContractFactory(
+    "FullMathTest",
+    deployer
+  );
+  const FullMathTest = await FullMathTestFactory.deploy();
+  await FullMathTest.waitForDeployment();
+  FullMathTestAddress = await FullMathTest.getAddress();
   console.log("✅ TickBitmapTest 地址:", TickBitmapTestAddress);
   console.log("✅ SwapMathTest 地址:", SwapMathTestAddress);
   console.log("✅ TickMathTest 地址:", TickMathTestAddress);
   console.log("✅ SwapMathTest 地址:", SwapMathTestAddress);
   console.log("✅ TestUniswapV3Router 地址:", TestUniswapV3RouterAddress);
+  console.log("✅ SqrtPriceMathTest 地址:", SqrtPriceMathTestAddress);
 }

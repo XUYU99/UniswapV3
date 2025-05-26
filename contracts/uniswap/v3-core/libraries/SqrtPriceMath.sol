@@ -16,33 +16,39 @@ library SqrtPriceMath {
     using LowGasSafeMath for uint256;
     using SafeCast for uint256;
 
-    /// @notice Gets the next sqrt price given a delta of token0
-    /// @dev Always rounds up, because in the exact output case (increasing price) we need to move the price at least
-    /// far enough to get the desired output amount, and in the exact input case (decreasing price) we need to move the
-    /// price less in order to not send too much output.
-    /// The most precise formula for this is liquidity * sqrtPX96 / (liquidity +- amount * sqrtPX96),
-    /// if this is impossible because of overflow, we calculate liquidity / (liquidity / sqrtPX96 +- amount).
-    /// @param sqrtPX96 The starting price, i.e. before accounting for the token0 delta
-    /// @param liquidity The amount of usable liquidity
-    /// @param amount How much of token0 to add or remove from virtual reserves
-    /// @param add Whether to add or remove the amount of token0
-    /// @return The price after adding or removing amount, depending on add
+    /// @notice 根据 token0 的增量计算下一个 sqrt 价格
+    /// @dev 始终向上取整：
+    ///      - exact output 情况（价格上涨）需至少推进到输出量足够；
+    ///      - exact input 情况（价格下跌）需尽可能少推进以避免给出过多 output。
+    /// 精确计算公式为：liquidity * sqrtPX96 / (liquidity ± amount * sqrtPX96)
+    /// 如果因溢出无法计算，则使用：liquidity / (liquidity / sqrtPX96 ± amount) 近似
+    /// @param sqrtPX96 当前起始价格（未加入 token0 的前价格）
+    /// @param liquidity 当前可用流动性
+    /// @param amount token0 的增量（加入或移除的数量）
+    /// @param add 为 true 表示增加 token0，否则表示减少 token0
+    /// @return 加/减完 amount 后的 sqrtPrice（Q64.96 格式）
     function getNextSqrtPriceFromAmount0RoundingUp(
         uint160 sqrtPX96,
         uint128 liquidity,
         uint256 amount,
         bool add
     ) internal pure returns (uint160) {
-        // we short circuit amount == 0 because the result is otherwise not guaranteed to equal the input price
+        // 快速路径：若 amount 为 0，则价格不变，直接返回当前价格
         if (amount == 0) return sqrtPX96;
+
+        // 将 liquidity 转换为 Q128.96 精度，即：liquidity * 2^96
         uint256 numerator1 = uint256(liquidity) << FixedPoint96.RESOLUTION;
 
         if (add) {
+            // ✅ 增加 token0（例如 exact output 模式）→ 价格下降
+
             uint256 product;
+            // 检查是否会乘法溢出（product = amount * sqrtPX96）
             if ((product = amount * sqrtPX96) / amount == sqrtPX96) {
                 uint256 denominator = numerator1 + product;
                 if (denominator >= numerator1)
-                    // always fits in 160 bits
+                    // 精确计算新价格：liquidity * sqrtPX96 / (liquidity + amount * sqrtPX96)
+                    // 并向上取整（因为价格下降，要推进得更小）
                     return
                         uint160(
                             FullMath.mulDivRoundingUp(
@@ -53,6 +59,8 @@ library SqrtPriceMath {
                         );
             }
 
+            // 若上述路径溢出，则使用替代公式：
+            // price = liquidity / (liquidity / sqrtPX96 + amount)
             return
                 uint160(
                     UnsafeMath.divRoundingUp(
@@ -61,14 +69,19 @@ library SqrtPriceMath {
                     )
                 );
         } else {
+            // ✅ 减少 token0（例如 exact input 模式）→ 价格上涨
+
             uint256 product;
-            // if the product overflows, we know the denominator underflows
-            // in addition, we must check that the denominator does not underflow
+            // 若乘法溢出，则 denominator 会下溢，因此先验证
             require(
                 (product = amount * sqrtPX96) / amount == sqrtPX96 &&
                     numerator1 > product
             );
+
             uint256 denominator = numerator1 - product;
+
+            // 计算新价格：liquidity * sqrtPX96 / (liquidity - amount * sqrtPX96)
+            // 使用 FullMath 向上取整
             return
                 FullMath
                     .mulDivRoundingUp(numerator1, sqrtPX96, denominator)

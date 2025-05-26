@@ -713,19 +713,19 @@ contract UniswapV3Pool is IUniswapV3Pool, NoDelegateCall {
     }
 
     struct StepComputations {
-        // the price at the beginning of the step
+        // 当前步骤开始时的 √价格（Q64.96 格式）
         uint160 sqrtPriceStartX96;
-        // the next tick to swap to from the current tick in the swap direction
+        // 当前 tick 方向上要推进到的下一个 tick
         int24 tickNext;
-        // whether tickNext is initialized or not
+        // tickNext 是否已经初始化（是否有流动性）
         bool initialized;
-        // sqrt(price) for the next tick (1/0)
+        // tickNext 对应的 √价格（Q64.96 格式）
         uint160 sqrtPriceNextX96;
-        // how much is being swapped in in this step
+        // 本步骤中实际输入的 token 数量（token0 或 token1）
         uint256 amountIn;
-        // how much is being swapped out
+        // 本步骤中实际输出的 token 数量（token0 或 token1）
         uint256 amountOut;
-        // how much fee is being paid in
+        // 本步骤中需要支付的手续费（从输入中扣除）
         uint256 feeAmount;
     }
 
@@ -767,31 +767,32 @@ contract UniswapV3Pool is IUniswapV3Pool, NoDelegateCall {
 
         // 初始化缓存
         SwapCache memory cache = SwapCache({
-            liquidityStart: liquidity,
-            blockTimestamp: _blockTimestamp(),
+            liquidityStart: liquidity, // swap 开始时的流动性
+            blockTimestamp: _blockTimestamp(), // 当前区块时间戳
             feeProtocol: zeroForOne
-                ? (slot0Start.feeProtocol % 16)
-                : (slot0Start.feeProtocol >> 4),
-            secondsPerLiquidityCumulativeX128: 0,
-            tickCumulative: 0,
-            computedLatestObservation: false
+                ? (slot0Start.feeProtocol % 16) // token0 的协议手续费
+                : (slot0Start.feeProtocol >> 4), // token1 的协议手续费
+            secondsPerLiquidityCumulativeX128: 0, // 用于 TWAP 观测，累计时间/流动性
+            tickCumulative: 0, // 累计 tick 值（用于 TWAP）
+            computedLatestObservation: false // 是否已计算过最新观测数据
         });
 
         // 判断是 exactInput（输入固定）还是 exactOutput（输出固定）
         bool exactInput = amountSpecified > 0;
 
-        // 初始化状态变量
+        // 初始化 swap 状态变量
         SwapState memory state = SwapState({
-            amountSpecifiedRemaining: amountSpecified,
-            amountCalculated: 0,
-            sqrtPriceX96: slot0Start.sqrtPriceX96,
-            tick: slot0Start.tick,
+            amountSpecifiedRemaining: amountSpecified, // 剩余待交换的输入或输出数量
+            amountCalculated: 0, // 已计算出的输出或输入金额
+            sqrtPriceX96: slot0Start.sqrtPriceX96, // 当前 √价格（Q64.96）
+            tick: slot0Start.tick, // 当前 tick 索引
             feeGrowthGlobalX128: zeroForOne
-                ? feeGrowthGlobal0X128
-                : feeGrowthGlobal1X128,
-            protocolFee: 0,
-            liquidity: cache.liquidityStart
+                ? feeGrowthGlobal0X128 // token0 的全局累计手续费
+                : feeGrowthGlobal1X128, // token1 的全局累计手续费
+            protocolFee: 0, // 累计的协议费
+            liquidity: cache.liquidityStart // 当前 tick 区间的流动性
         });
+
         // 主循环：逐步推进 swap，直到完成或到达价格边界
         while (
             state.amountSpecifiedRemaining != 0 &&

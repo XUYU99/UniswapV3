@@ -20,8 +20,8 @@ async function TestInit() {
 
   // 调用 mintLiquidity 函数
   await mintLiquidity();
-
-  await addLiquidity();
+  await addLiquidity(0, 60);
+  await addLiquidity(600, 900);
 
   await swapExactInputSingle();
 }
